@@ -1,0 +1,12 @@
+{
+  "name": "provenance-ai",
+  "private": true,
+  "workspaces": ["backend", "blockchain"],
+  "scripts": {
+    "dev": "npm run dev -w backend",
+    "test": "npm run test -w backend && npm run test -w blockchain",
+    "build": "npm run build -w backend",
+    "compile": "npm run compile -w blockchain",
+    "deploy": "npm run deploy -w blockchain"
+  }
+}
