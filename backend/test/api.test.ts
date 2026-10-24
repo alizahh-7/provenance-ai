@@ -5,6 +5,7 @@ import { ArtifactService } from "../src/services/artifactService.js";
 import { MetadataRepository } from "../src/services/metadataRepository.js";
 import type { ArtifactInput, OnChainArtifact } from "../src/models/artifact.js";
 import type { BlockchainGateway } from "../src/services/blockchainService.js";
+import { BlockchainServiceError } from "../src/utils/errors.js";
 
 class TestChain implements BlockchainGateway { private items = new Map<string, OnChainArtifact>(); async register(input: ArtifactInput) { const output = { ...input, registeredAt: 1, registrant: "0x0000000000000000000000000000000000000001", transactionHash: "0xtest", chainId: "31337" }; if (this.items.has(input.artifactId)) throw new Error("duplicate"); this.items.set(input.artifactId, output); return output; } async get(id: string) { return this.items.get(id) || null; } }
 const app = createApp(new ArtifactService(new TestChain(), new MetadataRepository()));
@@ -14,13 +15,17 @@ describe("artifact API", () => {
   it("validates a registration request", async () => { const res = await request(app).post("/api/artifacts/register").attach("artifact", Buffer.from("x"), "model.bin"); expect(res.status).toBe(400); expect(res.body.error).toContain("artifactType"); });
   it("registers, retrieves, and verifies a real file hash as PASS then FAIL", async () => {
     const registered = await request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v1").field("metadataUri", "ipfs://metadata").attach("artifact", Buffer.from("original bytes"), "model.bin");
-    expect(registered.status).toBe(201); expect(registered.body.artifact.fingerprint).toMatch(/^[a-f0-9]{64}$/); const id = registered.body.artifact.artifactId;
+    expect(registered.status).toBe(201); expect(registered.body.registrationStatus).toBe("CONFIRMED"); expect(registered.body.artifact.fingerprint).toMatch(/^[a-f0-9]{64}$/); expect(registered.body.artifact.transactionHash).toBe("0xtest"); const id = registered.body.artifact.artifactId;
     expect((await request(app).get(`/api/artifacts/${id}`)).body.artifact.fingerprint).toBe(registered.body.artifact.fingerprint);
     const pass = await request(app).post("/api/artifacts/verify").field("artifactId", id).attach("artifact", Buffer.from("original bytes"), "copy.bin"); expect(pass.body.status).toBe("PASS"); expect(pass.body.verified).toBe(true);
     const fail = await request(app).post("/api/artifacts/verify").field("artifactId", id).attach("artifact", Buffer.from("altered bytes"), "copy.bin"); expect(fail.body.status).toBe("FAIL"); expect(fail.body.verified).toBe(false);
   });
   it("rejects verification with a missing artifact file", async () => { expect((await request(app).post("/api/artifacts/verify").field("artifactId", "anything")).status).toBe(400); });
   it("rejects an invalid artifact identifier cleanly", async () => { const res = await request(app).post("/api/artifacts/verify").field("artifactId", "x".repeat(33)).attach("artifact", Buffer.from("bytes"), "artifact.bin"); expect(res.status).toBe(400); });
+  it("rejects malformed registration metadata", async () => {
+    const res = await request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v1").field("metadataUri", "file:///local-secret").attach("artifact", Buffer.from("bytes"), "model.bin");
+    expect(res.status).toBe(400); expect(res.body.code).toBe("INVALID_METADATA_URI");
+  });
   it("rejects malformed provenance JSON on registration", async () => {
     const res = await request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v2").field("provenance", "{not valid json").attach("artifact", Buffer.from("artifact bytes"), "artifact.bin");
     expect(res.status).toBe(400);
@@ -61,5 +66,59 @@ describe("artifact API", () => {
     const graph = await request(app).get(`/api/provenance/${res.body.artifact.artifactId}`);
     expect(graph.status).toBe(200);
     expect(graph.body.analysis.issues.some((issue: { code: string }) => issue.code === "MISSING_DATASET")).toBe(true);
+  });
+});
+
+describe("blockchain failure handling", () => {
+  const artifact = Buffer.from("artifact content");
+  const appWith = (chain: BlockchainGateway) => createApp(new ArtifactService(chain, new MetadataRepository()));
+  const errorChain = (registerError?: Error, readError?: Error): BlockchainGateway => ({
+    register: async () => { throw registerError ?? new Error("unexpected"); },
+    get: async () => { if (readError) throw readError; return null; }
+  });
+
+  it("does not report success when blockchain registration fails", async () => {
+    const app = appWith(errorChain(new BlockchainServiceError("Blockchain transaction failed or was reverted", "TRANSACTION_FAILED")));
+    const res = await request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v1").attach("artifact", artifact, "model.bin");
+    expect(res.status).toBe(502); expect(res.body).toMatchObject({ success: false, code: "TRANSACTION_FAILED" });
+  });
+  it("reports duplicate blockchain registration distinctly", async () => {
+    const app = appWith(errorChain(new BlockchainServiceError("Artifact ID is already registered on the blockchain", "DUPLICATE_ARTIFACT", 409)));
+    const res = await request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v1").attach("artifact", artifact, "model.bin");
+    expect(res.status).toBe(409); expect(res.body.code).toBe("DUPLICATE_ARTIFACT");
+  });
+  it("does not turn an unavailable RPC into a verification FAIL", async () => {
+    const app = appWith(errorChain(undefined, new BlockchainServiceError("Unable to connect to the configured blockchain RPC", "RPC_UNAVAILABLE")));
+    const res = await request(app).post("/api/artifacts/verify").field("artifactId", "art_rpc_failure").attach("artifact", artifact, "model.bin");
+    expect(res.status).toBe(502); expect(res.body.code).toBe("RPC_UNAVAILABLE"); expect(res.body.status).toBeUndefined();
+  });
+  it("distinguishes an unknown artifact from a hash mismatch", async () => {
+    const app = appWith(errorChain());
+    const res = await request(app).post("/api/artifacts/verify").field("artifactId", "art_unknown").attach("artifact", artifact, "model.bin");
+    expect(res.status).toBe(404); expect(res.body.code).toBe("ARTIFACT_NOT_FOUND");
+  });
+  it("reports a contract read failure without a PASS or FAIL", async () => {
+    const app = appWith(errorChain(undefined, new BlockchainServiceError("Unable to read artifact evidence from the blockchain", "CONTRACT_READ_FAILED")));
+    const res = await request(app).post("/api/artifacts/verify").field("artifactId", "art_read_failure").attach("artifact", artifact, "model.bin");
+    expect(res.status).toBe(502); expect(res.body.code).toBe("CONTRACT_READ_FAILED"); expect(res.body.status).toBeUndefined();
+  });
+  it("enforces the configured multipart file-size limit", async () => {
+    const res = await request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v1").attach("artifact", Buffer.alloc(50 * 1024 * 1024 + 1), "large.bin");
+    expect(res.status).toBe(413); expect(res.body.code).toBe("FILE_TOO_LARGE");
+  });
+});
+
+describe("Sepolia registration regression", () => {
+  const registeredId = "art_568d226bdb21417583675c3ce967";
+  const registeredHash = "157b67ceb644670988f1ac98eeba746366253976b303bf4e8c8c9cf7069c1e51";
+  const registeredArtifact: OnChainArtifact = { artifactId: registeredId, fingerprint: registeredHash, artifactType: "model", version: "v1", metadataUri: "ipfs://provenanceai/demo-v1", registeredAt: 1_735_000_000, registrant: "0x0000000000000000000000000000000000000001", transactionHash: "0x6163668ea550e57666a6bddfb73689067be064a4f4b2d133e4340e097694c499", chainId: "11155111", contractAddress: "0x1361CCbaB258e2cBb7Cb2dF7Efa03b2F06d8d431" };
+  const chain: BlockchainGateway = { register: async () => { throw new Error("not used by verification"); }, get: async (id) => id === registeredId ? registeredArtifact : null };
+  const app = createApp(new ArtifactService(chain, new MetadataRepository()));
+
+  it("verifies the exact successful Sepolia registration as PASS and a changed copy as FAIL", async () => {
+    const original = await request(app).post("/api/artifacts/verify").field("artifactId", registeredId).attach("artifact", Buffer.from("ProvenanceAI Sepolia demo artifact"), "demo-original.txt");
+    expect(original.body).toMatchObject({ verified: true, status: "PASS", uploadedHash: registeredHash, registeredHash, contractAddress: registeredArtifact.contractAddress, chainId: "11155111" });
+    const changed = await request(app).post("/api/artifacts/verify").field("artifactId", registeredId).attach("artifact", Buffer.from("ProvenanceAI Sepolia demo artifact modified"), "demo-tampered.txt");
+    expect(changed.body).toMatchObject({ verified: false, status: "FAIL", registeredHash });
   });
 });
