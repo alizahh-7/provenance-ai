@@ -7,6 +7,7 @@
     "test": "npm run test -w backend && npm run test -w blockchain",
     "build": "npm run build -w backend",
     "compile": "npm run compile -w blockchain",
-    "deploy": "npm run deploy -w blockchain"
+    "deploy": "npm run deploy -w blockchain",
+    "config:check": "node scripts/config-check.mjs"
   }
 }
