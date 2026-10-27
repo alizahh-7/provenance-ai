@@ -8,7 +8,7 @@ import { ApiError } from "../utils/errors.js";
 
 export class ArtifactService {
   constructor(private readonly chain: BlockchainGateway, private readonly metadata: MetadataRepository) {}
-  private assertArtifactId(artifactId: string) { if (!artifactId?.trim() || Buffer.byteLength(artifactId, "utf8") > 32) throw new ApiError("artifactId must be a non-empty UTF-8 value no longer than 32 bytes", 400, "INVALID_ARTIFACT_ID"); }
+  private assertArtifactId(artifactId: string) { if (!artifactId?.trim() || Buffer.byteLength(artifactId, "utf8") > 32 || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(artifactId)) throw new ApiError("artifactId must be a safe non-empty identifier no longer than 32 UTF-8 bytes", 400, "INVALID_ARTIFACT_ID"); }
   private validateRegistrationInput(values: Partial<Omit<ArtifactInput, "artifactId" | "fingerprint">>) {
     const validLabel = (value: string | undefined) => Boolean(value?.trim() && value.trim().length <= 64 && /^[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(value.trim()));
     if (!validLabel(values.artifactType)) throw new ApiError("artifactType is required and must be at most 64 safe text characters", 400, "INVALID_ARTIFACT_TYPE");
@@ -44,8 +44,12 @@ export class ArtifactService {
   async verify(file: Express.Multer.File, artifactId: string) { this.assertArtifactId(artifactId); const uploaded = await hashFile(file.path); const registered = await this.chain.get(artifactId); if (!registered) throw new ApiError("Artifact was not found on the configured blockchain", 404, "ARTIFACT_NOT_FOUND"); const verified = uploaded.hash === registered.fingerprint.toLowerCase(); return { verified, status: verified ? "PASS" : "FAIL", artifactId, uploadedHash: uploaded.hash, registeredHash: registered.fingerprint, algorithm: uploaded.algorithm, fileSize: uploaded.fileSize, contractAddress: registered.contractAddress, chainId: registered.chainId, registeredAt: registered.registeredAt, registrant: registered.registrant, message: verified ? "Artifact fingerprint matches the blockchain record." : "Artifact fingerprint does not match the blockchain record." }; }
   async get(id: string) { this.assertArtifactId(id); const result = await this.chain.get(id); if (!result) throw new ApiError("Artifact was not found on the configured blockchain", 404, "ARTIFACT_NOT_FOUND"); return result; }
   async graph(id: string) {
-    const graph = await this.metadata.graph(id);
+    this.assertArtifactId(id);
+    const chainArtifact = await this.chain.get(id);
+    const storedArtifact = await this.metadata.get(id);
     const record = await this.metadata.getProvenance(id);
+    if (!chainArtifact && !storedArtifact && !record) throw new ApiError("Artifact was not found on the configured blockchain", 404, "ARTIFACT_NOT_FOUND");
+    const graph = await this.metadata.graph(id, chainArtifact);
     return {
       ...graph,
       analysis: await analyzeProvenance(record, this.metadata)

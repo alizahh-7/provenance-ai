@@ -8,6 +8,7 @@ export interface ProvenanceRecord {
   version: string;
   parent?: string | null;
   dataset?: string | null;
+  datasets?: string[];
   preprocessing?: string | null;
   trainingRun?: string | null;
   metadata?: Record<string, unknown> | null;
