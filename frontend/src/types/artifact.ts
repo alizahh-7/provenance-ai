@@ -1,4 +1,7 @@
 export type Artifact = { artifactId: string; fingerprint?: string; artifactType?: string; version?: string; metadataUri?: string; registeredAt?: number | string; registrant?: string; transactionHash?: string; chainId?: string; contractAddress?: string; originalFilename?: string; fileSize?: number; algorithm?: string; network?: string; };
 export type Verification = { verified: boolean; status: 'PASS'|'FAIL'; artifactId: string; uploadedHash?: string; calculatedHash?: string; registeredHash?: string; expectedHash?: string; message?: string; };
-export type ProvenanceNode = { id: string; label?: string; type?: string; version?: string; timestamp?: string; status?: string; name?: string; };
-export type Provenance = { nodes: ProvenanceNode[]; relationships?: {from:string;to:string;relationship?:string}[]; };
+export type ProvenanceNode = { id: string; label?: string; type?: string; version?: string; timestamp?: string; status?: string; name?: string; metadata?: Record<string, unknown>; };
+export type ProvenanceEdge = { id?: string; source: string; target: string; type?: string; };
+export type ProvenanceIssue = { code: string; severity: 'LOW'|'MEDIUM'|'HIGH'; message: string; affectedNodeId: string|null; affectedField?: string; };
+export type ProvenanceAnalysis = { riskLevel: 'NONE'|'LOW'|'MEDIUM'|'HIGH'; riskScore: number; severity: 'LOW'|'MEDIUM'|'HIGH'; issues: ProvenanceIssue[]; explanation: string; };
+export type Provenance = { nodes: ProvenanceNode[]; edges?: ProvenanceEdge[]; relationships?: {from:string;to:string;relationship?:string}[]; analysis?: ProvenanceAnalysis; };
