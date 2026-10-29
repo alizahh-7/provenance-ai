@@ -1,0 +1,14 @@
+{
+  "artifactType": "model",
+  "version": "v1.0.0",
+  "dataset": "dataset-climate-2025",
+  "preprocessing": "prep-normalize-07",
+  "trainingRun": "train-xgb-2025-04-18",
+  "metadata": {
+    "name": "Regional Forecast Model",
+    "version": "v1.0.0",
+    "datasetMetadata": { "format": "parquet", "rows": 18420 },
+    "preprocessing": { "method": "z-score", "codeRevision": "a13fd04" },
+    "training": { "framework": "xgboost", "seed": 42 }
+  }
+}

@@ -6,5 +6,6 @@ export const artifactController = (service: ArtifactService): Record<string, Req
   register: async (req, res) => { const file = requireFile(req.file); try { const provenanceInput = typeof req.body.provenance === "string" ? req.body.provenance : typeof req.body.provenance === "object" && req.body.provenance ? JSON.stringify(req.body.provenance) : undefined; const artifact = await service.register(file, req.body, provenanceInput); res.status(201).json({ success: true, registrationStatus: "CONFIRMED", artifact }); } finally { await removeTemporaryFile(file.path); } },
   verify: async (req, res) => { const file = requireFile(req.file); try { res.json(await service.verify(file, String(req.body.artifactId || ""))); } finally { await removeTemporaryFile(file.path); } },
   get: async (req, res) => { const id = String(req.params.id); res.json({ success: true, artifact: await service.get(id) }); },
+  recent: async (req, res) => { const requested = Number(req.query.limit ?? 5); res.json({ success: true, artifacts: await service.recent(Number.isFinite(requested) ? requested : 5) }); },
   provenance: async (req, res) => { const id = String(req.params.id); const result = await service.graph(id); res.json({ success: true, artifactId: id, ...result, graph: { nodes: result.nodes, edges: result.edges, relationships: result.relationships } }); }
 });

@@ -1,4 +1,5 @@
 export type Artifact = { artifactId: string; fingerprint?: string; artifactType?: string; version?: string; metadataUri?: string; registeredAt?: number | string; registrant?: string; transactionHash?: string; chainId?: string; contractAddress?: string; originalFilename?: string; fileSize?: number; algorithm?: string; network?: string; };
+export type ProvenanceInput = { artifactType?: string; version?: string; parent?: string|null; dataset?: string|null; datasets?: string[]; preprocessing?: string|null; trainingRun?: string|null; metadata?: Record<string,unknown>|null; timestamp?: number|string|null; relationships?: Array<{from:string;to:string;type:string}>; };
 export type Verification = { verified: boolean; status: 'PASS'|'FAIL'; artifactId: string; uploadedHash?: string; calculatedHash?: string; registeredHash?: string; expectedHash?: string; message?: string; };
 export type ProvenanceNode = { id: string; label?: string; type?: string; version?: string; timestamp?: string; status?: string; name?: string; metadata?: Record<string, unknown>; };
 export type ProvenanceEdge = { id?: string; source: string; target: string; type?: string; };

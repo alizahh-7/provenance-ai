@@ -33,10 +33,11 @@ export class ArtifactService {
         : undefined;
 
     const artifact = await this.chain.register(input);
-    await this.metadata.save(artifact);
-
-    if (provenance) {
-      await this.metadata.saveProvenance(provenance);
+    try {
+      await this.metadata.save(artifact);
+      if (provenance) await this.metadata.saveProvenance(provenance);
+    } catch {
+      throw new ApiError(`Blockchain registration succeeded for ${artifact.artifactId}, but metadata persistence failed. Do not retry registration; recover this artifact by ID after storage is restored.`, 502, "METADATA_PERSISTENCE_FAILED");
     }
 
     return { ...artifact, fileSize: fp.fileSize, algorithm: fp.algorithm, originalFilename: file.originalname };
@@ -54,5 +55,9 @@ export class ArtifactService {
       ...graph,
       analysis: await analyzeProvenance(record, this.metadata)
     };
+  }
+  async recent(limit: number) {
+    if (!this.metadata.isPersistent) throw new ApiError("Recent activity is unavailable while METADATA_STORAGE=memory. Configure Firestore for durable history.", 503, "PERSISTENCE_UNAVAILABLE");
+    return this.metadata.recent(Math.max(1, Math.min(limit, 50)));
   }
 }

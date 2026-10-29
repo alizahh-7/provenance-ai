@@ -145,6 +145,12 @@ For that complete `v1.0.0` lineage, the response contains dataset → preprocess
 
 The example shows the duplicate top-level compatibility arrays in full; the grouped `graph` property is the preferred frontend field.
 
+## Firestore persistence
+
+Set `METADATA_STORAGE=firestore` in the server environment for durable artifact metadata, provenance records, and recent activity. Firebase Admin remains server-only. Configure either `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`, or `FIREBASE_PROJECT_ID` with `GOOGLE_APPLICATION_CREDENTIALS` pointing to an application-default service-account file. Do not expose any of these values to the frontend or commit service-account JSON.
+
+`METADATA_STORAGE=memory` is an explicit local-development fallback only. It does not survive restart and `/api/artifacts` returns `503 PERSISTENCE_UNAVAILABLE` rather than claiming durable history. Blockchain verification remains chain-backed in either mode. Metadata is saved only after confirmed blockchain registration; if Firestore fails after that confirmation, registration returns `502 METADATA_PERSISTENCE_FAILED` with recovery guidance and must not be retried blindly.
+
 ## Verification
 
 `npm run build -w backend`, `npm run test -w backend`, `npm run compile -w blockchain`, and `npm run test -w blockchain` are the project verification commands. Backend tests use a mock blockchain gateway and do not send Sepolia transactions.

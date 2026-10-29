@@ -1,141 +1,2234 @@
-import { useEffect, useRef, useState, type ReactNode, type FormEvent, type DragEvent } from 'react';
-import { BrowserRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { getArtifact, getProvenance, isDemoMode, registerArtifact, verifyArtifact } from './services';
-import type { Artifact, Provenance, Verification } from './types/artifact';
-import './styles.css';
-const date=(v?:string|number)=>v?new Date(typeof v==='number'?v*1000:v).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Not provided';
-const short=(s?:string,n=18)=>s&&s.length>n?`${s.slice(0,n)}…${s.slice(-7)}`:s||'Not provided';
-const size=(n?:number)=>n==null?'—':n<1024?`${n} B`:n<1048576?`${(n/1024).toFixed(1)} KB`:`${(n/1048576).toFixed(2)} MB`;
-function Mark(){return <span className="brand-mark"><span/><span/><span/></span>}
-const appNavigation=[
-  {to:'/app',label:'Overview',icon:'⌂',end:true},
-  {to:'/app/register',label:'Register',icon:'＋'},
-  {to:'/app/verify',label:'Verify',icon:'⌕'},
-  {to:'/app/artifacts',label:'Artifacts',icon:'▤'},
-  {to:'/app/provenance',label:'Provenance',icon:'⌁'},
-  {to:'/app/analysis',label:'AI Analysis',icon:'◇'}
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type FormEvent,
+  type DragEvent,
+} from "react";
+import {
+  BrowserRouter,
+  Link,
+  NavLink,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+import {
+  getArtifact,
+  getProvenance,
+  getRecentArtifacts,
+  isDemoMode,
+  registerArtifact,
+  verifyArtifact,
+} from "./services";
+import type {
+  Artifact,
+  Provenance,
+  ProvenanceInput,
+  Verification,
+} from "./types/artifact";
+import { validateRegistrationProvenance } from "./lib/registration";
+import "./styles.css";
+const date = (v?: string | number) =>
+  v
+    ? new Date(typeof v === "number" ? v * 1000 : v).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "Not provided";
+const short = (s?: string, n = 18) =>
+  s && s.length > n ? `${s.slice(0, n)}…${s.slice(-7)}` : s || "Not provided";
+const size = (n?: number) =>
+  n == null
+    ? "—"
+    : n < 1024
+    ? `${n} B`
+    : n < 1048576
+    ? `${(n / 1024).toFixed(1)} KB`
+    : `${(n / 1048576).toFixed(2)} MB`;
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const uploadSizeError = (file: File) =>
+  file.size > MAX_UPLOAD_BYTES
+    ? `This file is ${size(file.size)}. The configured upload limit is 50 MB.`
+    : "";
+function Mark() {
+  return (
+    <span className="brand-mark">
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}
+const appNavigation = [
+  { to: "/app", label: "Overview", icon: "⌂", end: true },
+  { to: "/app/register", label: "Register", icon: "＋" },
+  { to: "/app/verify", label: "Verify", icon: "⌕" },
+  { to: "/app/artifacts", label: "Artifacts", icon: "▤" },
+  { to: "/app/provenance", label: "Provenance", icon: "⌁" },
+  { to: "/app/analysis", label: "AI Analysis", icon: "◇" },
 ];
-function Shell(){
-  const [menuOpen,setMenuOpen]=useState(false);
-  const location=useLocation();
-  useEffect(()=>setMenuOpen(false),[location.pathname]);
-  const active=appNavigation.find(item=>item.end?location.pathname==='/app':location.pathname===item.to||location.pathname.startsWith(`${item.to}/`));
-  return <div className={`app-shell ${menuOpen?'nav-open':''}`}>
-    <aside className={`sidebar ${menuOpen?'open':''}`}>
-      <Link to="/" className="brand"><Mark/><span>Provanance - AL<small>VERIFIABLE AI TRUST</small></span></Link>
-      <div className="nav-label">PLATFORM</div>
-      <nav aria-label="Platform navigation">{appNavigation.map(item=><NavLink key={item.to} to={item.to} end={item.end}><i aria-hidden="true">{item.icon}</i>{item.label}</NavLink>)}</nav>
-      <div className="side-note"><div className="side-lock">◇</div><strong>Proof beyond trust.</strong><p>Evidence anchored on-chain. Your files stay off-chain.</p><div className="shell-status"><span>NETWORK</span><b>Sepolia</b><small>Per artifact evidence</small></div><div className="shell-status"><span>API SERVICE</span><b>{isDemoMode?'Mock mode':'Live API configured'}</b><small>{isDemoMode?'Local demo records':'Connection checked on request'}</small></div><Link className="shell-help" to="/#evidence">How evidence works <i>↗</i></Link></div>
-      <div className="side-foot"><span className="avatar">PA</span><span>COMPSPHERE 12<small>HACKSPHERE 2026</small></span></div>
-    </aside>
-    {menuOpen&&<button className="mobile-scrim" aria-label="Close navigation" onClick={()=>setMenuOpen(false)}/>}
-    <main className="main">
-      <header className="topbar"><button className="mobile-menu" aria-label="Toggle navigation" aria-expanded={menuOpen} onClick={()=>setMenuOpen(open=>!open)}>☰</button><div><span className="crumb">Workspace</span><span className="crumb-sep">/</span><span className="crumb current">{active?.label||'Artifacts'}</span></div><div className="topright">{location.pathname==='/app/artifacts'&&<Link className="topbar-action" to="/app/register">＋ Register artifact</Link>}{location.pathname.startsWith('/app/artifacts/')&&<Link className="topbar-action" to={`/app/verify?artifactId=${encodeURIComponent(decodeURIComponent(location.pathname.split('/').pop()||''))}`}>Verify artifact →</Link>}</div></header>
-      <div className="content"><Outlet/><footer>Provanance - AL <span>·</span> A VERIFIABLE CHAIN OF TRUST FOR AI <span className="footer-right">COMPSPHERE 12 / HACKSPHERE 2026</span></footer></div>
+function Shell() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+  const active = appNavigation.find((item) =>
+    item.end
+      ? location.pathname === "/app"
+      : location.pathname === item.to ||
+        location.pathname.startsWith(`${item.to}/`)
+  );
+  return (
+    <div className={`app-shell ${menuOpen ? "nav-open" : ""}`}>
+      <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
+        <Link to="/" className="brand">
+          <Mark />
+          <span>
+            ProvenanceAI<small>VERIFIABLE AI TRUST</small>
+          </span>
+        </Link>
+        <div className="nav-label">PLATFORM</div>
+        <nav aria-label="Platform navigation">
+          {appNavigation.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end}>
+              <i aria-hidden="true">{item.icon}</i>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="side-note">
+          <div className="side-lock">◇</div>
+          <strong>Proof beyond trust.</strong>
+          <p>Evidence anchored on-chain. Your files stay off-chain.</p>
+          <div className="shell-status">
+            <span>NETWORK</span>
+            <b>Sepolia</b>
+            <small>Per artifact evidence</small>
+          </div>
+          <div className="shell-status">
+            <span>API SERVICE</span>
+            <b>{isDemoMode ? "Mock mode" : "Live API configured"}</b>
+            <small>
+              {isDemoMode
+                ? "Local demo records"
+                : "Connection checked on request"}
+            </small>
+          </div>
+          <Link className="shell-help" to="/#evidence">
+            How evidence works <i>↗</i>
+          </Link>
+        </div>
+        <div className="side-foot">
+          <span className="avatar">AI</span>
+          <span>
+            COMPSPHERE 12<small>HACKSPHERE 2026</small>
+          </span>
+        </div>
+      </aside>
+      {menuOpen && (
+        <button
+          className="mobile-scrim"
+          aria-label="Close navigation"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+      <main className="main">
+        <header className="topbar">
+          <button
+            className="mobile-menu"
+            aria-label="Toggle navigation"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            ☰
+          </button>
+          <div>
+            <span className="crumb">Workspace</span>
+            <span className="crumb-sep">/</span>
+            <span className="crumb current">
+              {active?.label || "Artifacts"}
+            </span>
+          </div>
+          <div className="topright">
+            {location.pathname === "/app/artifacts" && (
+              <Link className="topbar-action" to="/app/register">
+                ＋ Register artifact
+              </Link>
+            )}
+            {location.pathname.startsWith("/app/artifacts/") && (
+              <Link
+                className="topbar-action"
+                to={`/app/verify?artifactId=${encodeURIComponent(
+                  decodeURIComponent(location.pathname.split("/").pop() || "")
+                )}`}
+              >
+                Verify artifact →
+              </Link>
+            )}
+          </div>
+        </header>
+        <div className="content">
+          <Outlet />
+          <footer>
+            ProvenanceAI <span>·</span> A VERIFIABLE CHAIN OF TRUST FOR AI{" "}
+            <span className="footer-right">
+              COMPSPHERE 12 / HACKSPHERE 2026
+            </span>
+          </footer>
+        </div>
+      </main>
+    </div>
+  );
+}
+function Reveal({
+  children,
+  className = "",
+  id,
+}: {
+  children: ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div
+      id={id}
+      ref={ref}
+      className={`reveal ${visible ? "is-visible" : ""} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+function Landing() {
+  return (
+    <main className="site-landing">
+      <header className="site-nav-wrap">
+        <nav className="site-nav">
+          <Link to="/" className="site-brand">
+            <Mark />
+            <span>
+              ProvenanceAI<small>AI PROVENANCE INFRASTRUCTURE</small>
+            </span>
+          </Link>
+          <div className="site-nav-links">
+            <a href="#how-it-works">How it works</a>
+            <a href="#evidence">Evidence model</a>
+          </div>
+          <Link to="/app" className="button primary site-nav-cta">
+            Open Platform <span>↗</span>
+          </Link>
+        </nav>
+      </header>
+      <section className="site-hero">
+        <div className="site-hero-inner">
+          <div className="site-hero-copy">
+            <div className="eyebrow">
+              <span className="eyebrow-line" /> VERIFIABLE AI INFRASTRUCTURE
+            </div>
+            <h1>
+              AI needs a<br />
+              <span>chain of trust.</span>
+            </h1>
+            <p>
+              ProvenanceAI helps teams verify the integrity of AI datasets and
+              models, then trace the evidence behind them.
+            </p>
+            <div className="site-hero-actions">
+              <Link to="/app" className="button primary">
+                Open Platform <span>↗</span>
+              </Link>
+              <a href="#how-it-works" className="button secondary">
+                See How It Works <span>↓</span>
+              </a>
+            </div>
+            <div className="site-trust-note">
+              <span>◇</span> Evidence you can verify. Artifacts stay off-chain.
+            </div>
+          </div>
+          <div
+            className="chain-visual"
+            aria-label="Illustration of dataset provenance flowing through preprocessing and training to a verified model"
+          >
+            <div className="chain-visual-top">
+              <span>PROVENANCE SEQUENCE</span>
+              <span>01 — 05</span>
+            </div>
+            <div className="chain-step">
+              <span className="chain-node">◉</span>
+              <span>
+                <small>ORIGIN</small>
+                <b>Dataset</b>
+              </span>
+              <i>Fingerprint created</i>
+            </div>
+            <div className="chain-connector">
+              <span />
+            </div>
+            <div className="chain-step">
+              <span className="chain-node">⌁</span>
+              <span>
+                <small>TRANSFORMATION</small>
+                <b>Preprocessing</b>
+              </span>
+              <i>Lineage recorded</i>
+            </div>
+            <div className="chain-connector">
+              <span />
+            </div>
+            <div className="chain-step">
+              <span className="chain-node">◌</span>
+              <span>
+                <small>TRAINING</small>
+                <b>Training run</b>
+              </span>
+              <i>Evidence connected</i>
+            </div>
+            <div className="chain-connector">
+              <span />
+            </div>
+            <div className="chain-step">
+              <span className="chain-node">⬡</span>
+              <span>
+                <small>ARTIFACT</small>
+                <b>Model</b>
+              </span>
+              <i>Version tracked</i>
+            </div>
+            <div className="chain-connector">
+              <span />
+            </div>
+            <div className="chain-step verified">
+              <span className="chain-node">✓</span>
+              <span>
+                <small>INTEGRITY CHECK</small>
+                <b>Ready to verify</b>
+              </span>
+              <i>SHA-256 evidence</i>
+            </div>
+            <div className="chain-visual-foot">
+              <span className="live-dot" /> Conceptual provenance flow{" "}
+              <span>ARTIFACT → EVIDENCE</span>
+            </div>
+          </div>
+        </div>
+        <div className="hero-rule">
+          <span>TRUST THE PROOF</span>
+          <span>
+            REGISTER <i /> VERIFY <i /> TRACE
+          </span>
+        </div>
+      </section>
+      <Reveal className="story-section">
+        <div className="section-kicker">01 / THE TRUST GAP</div>
+        <div className="story-grid">
+          <h2>
+            A chain of trust
+            <br />
+            for every AI artifact.
+          </h2>
+          <div>
+            <p>
+              Models and datasets move through versions, transformations, and
+              training runs. A name or a promise cannot prove what changed along
+              the way.
+            </p>
+            <p>
+              ProvenanceAI creates a cryptographic fingerprint and connects it
+              to provenance evidence, so others can verify the artifact they
+              received.
+            </p>
+            <Link to="/app" className="inline-link">
+              Explore the platform <span>→</span>
+            </Link>
+          </div>
+        </div>
+      </Reveal>
+      <section className="how-section" id="how-it-works">
+        <Reveal>
+          <div className="section-kicker">02 / THE WORKFLOW</div>
+          <div className="section-heading-row">
+            <div>
+              <h2>Three steps. Clear evidence.</h2>
+              <p>
+                Move from an artifact file to a verifiable provenance record.
+              </p>
+            </div>
+            <Link to="/app" className="inline-link">
+              Open the platform <span>↗</span>
+            </Link>
+          </div>
+        </Reveal>
+        <div className="steps-grid">
+          <Reveal className="step-card">
+            <span className="step-index">01</span>
+            <div className="step-icon">↑</div>
+            <h3>Register</h3>
+            <p>
+              Create a SHA-256 fingerprint for a dataset or model and register
+              its metadata.
+            </p>
+            <span className="step-caption">ORIGIN → FINGERPRINT</span>
+          </Reveal>
+          <Reveal className="step-card">
+            <span className="step-index">02</span>
+            <div className="step-icon">⌕</div>
+            <h3>Verify</h3>
+            <p>
+              Upload the artifact again and compare its fingerprint against the
+              registered proof.
+            </p>
+            <span className="step-caption">FILE → COMPARISON</span>
+          </Reveal>
+          <Reveal className="step-card">
+            <span className="step-index">03</span>
+            <div className="step-icon">⌁</div>
+            <h3>Trace</h3>
+            <p>
+              Explore the available lineage and see how provenance evidence
+              connects.
+            </p>
+            <span className="step-caption">LINEAGE → CONTEXT</span>
+          </Reveal>
+        </div>
+      </section>
+      <Reveal className="flow-section">
+        <div className="section-kicker">03 / BUILT FOR AI PROVENANCE</div>
+        <div className="flow-copy">
+          <h2>
+            Context that travels
+            <br />
+            with the model.
+          </h2>
+          <p>
+            Trace an artifact’s journey from its data origin through processing
+            and training to a model version. Each step can be represented as
+            provenance evidence.
+          </p>
+        </div>
+        <div className="flow-track">
+          <div>
+            <span>01</span>
+            <b>Dataset</b>
+            <small>Origin</small>
+          </div>
+          <i />
+          <div>
+            <span>02</span>
+            <b>Processing</b>
+            <small>Transformation</small>
+          </div>
+          <i />
+          <div>
+            <span>03</span>
+            <b>Training</b>
+            <small>Run</small>
+          </div>
+          <i />
+          <div>
+            <span>04</span>
+            <b>Model</b>
+            <small>Version</small>
+          </div>
+        </div>
+      </Reveal>
+      <Reveal className="evidence-section" id="evidence">
+        <div className="evidence-emblem">
+          <Mark />
+        </div>
+        <div>
+          <div className="section-kicker">04 / EVIDENCE MODEL</div>
+          <h2>
+            Proof on-chain.
+            <br />
+            Artifacts off-chain.
+          </h2>
+          <p>
+            Artifact files remain off-chain. The registration flow sends a
+            compact fingerprint and metadata to the backend, which handles
+            registration and reports blockchain evidence when available.
+          </p>
+          <Link to="/app" className="inline-link">
+            See the evidence workflow <span>→</span>
+          </Link>
+        </div>
+        <div className="evidence-diagram">
+          <div>
+            <span>YOUR ARTIFACT</span>
+            <b>Dataset or model file</b>
+            <small>Remains off-chain</small>
+          </div>
+          <i>SHA-256</i>
+          <div>
+            <span>VERIFICATION EVIDENCE</span>
+            <b>Fingerprint + metadata</b>
+            <small>Registered through the backend</small>
+          </div>
+          <div className="evidence-chain">
+            ◇ <span>Blockchain anchor when configured</span>
+          </div>
+        </div>
+      </Reveal>
+      <section className="final-cta">
+        <div className="section-kicker">
+          PROVENANCEAI / TRUST INFRASTRUCTURE
+        </div>
+        <div className="final-cta-row">
+          <div>
+            <h2>
+              Make AI artifacts
+              <br />
+              verifiable.
+            </h2>
+            <p>Start with a file. Leave with evidence.</p>
+          </div>
+          <Link to="/app" className="button light-button">
+            Open Platform <span>↗</span>
+          </Link>
+        </div>
+      </section>
+      <footer className="site-footer">
+        <Link to="/" className="site-brand">
+          <Mark />
+          <span>
+            ProvenanceAI<small>AI PROVENANCE INFRASTRUCTURE</small>
+          </span>
+        </Link>
+        <span>COMPSPHERE 12 / HACKSPHERE 2026</span>
+        <span>A VERIFIABLE CHAIN OF TRUST FOR AI</span>
+      </footer>
     </main>
-  </div>
+  );
 }
-function Reveal({children,className='',id}:{children:ReactNode;className?:string;id?:string}){
-  const ref=useRef<HTMLDivElement>(null);
-  const [visible,setVisible]=useState(false);
-  useEffect(()=>{const element=ref.current;if(!element)return;const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect()}});observer.observe(element);return()=>observer.disconnect()},[]);
-  return <div id={id} ref={ref} className={`reveal ${visible?'is-visible':''} ${className}`}>{children}</div>
-}
-function Landing(){
-  return <main className="site-landing">
-    <header className="site-nav-wrap"><nav className="site-nav"><Link to="/" className="site-brand"><Mark/><span>Provanance - AL<small>AI PROVENANCE INFRASTRUCTURE</small></span></Link><div className="site-nav-links"><a href="#how-it-works">How it works</a><a href="#evidence">Evidence model</a></div><Link to="/app" className="button primary site-nav-cta">Open Platform <span>↗</span></Link></nav></header>
-    <section className="site-hero"><div className="site-hero-inner"><div className="site-hero-copy"><div className="eyebrow"><span className="eyebrow-line"/> VERIFIABLE AI INFRASTRUCTURE</div><h1>AI needs a<br/><span>chain of trust.</span></h1><p>Provanance - AL helps teams verify the integrity of AI datasets and models, then trace the evidence behind them.</p><div className="site-hero-actions"><Link to="/app" className="button primary">Open Platform <span>↗</span></Link><a href="#how-it-works" className="button secondary">See How It Works <span>↓</span></a></div><div className="site-trust-note"><span>◇</span> Evidence you can verify. Artifacts stay off-chain.</div></div>
-      <div className="chain-visual" aria-label="Illustration of dataset provenance flowing through preprocessing and training to a verified model"><div className="chain-visual-top"><span>PROVENANCE SEQUENCE</span><span>01 — 05</span></div><div className="chain-step"><span className="chain-node">◉</span><span><small>ORIGIN</small><b>Dataset</b></span><i>Fingerprint created</i></div><div className="chain-connector"><span/></div><div className="chain-step"><span className="chain-node">⌁</span><span><small>TRANSFORMATION</small><b>Preprocessing</b></span><i>Lineage recorded</i></div><div className="chain-connector"><span/></div><div className="chain-step"><span className="chain-node">◌</span><span><small>TRAINING</small><b>Training run</b></span><i>Evidence connected</i></div><div className="chain-connector"><span/></div><div className="chain-step"><span className="chain-node">⬡</span><span><small>ARTIFACT</small><b>Model</b></span><i>Version tracked</i></div><div className="chain-connector"><span/></div><div className="chain-step verified"><span className="chain-node">✓</span><span><small>INTEGRITY CHECK</small><b>Ready to verify</b></span><i>SHA-256 evidence</i></div><div className="chain-visual-foot"><span className="live-dot"/> Conceptual provenance flow <span>ARTIFACT → EVIDENCE</span></div></div>
-    </div><div className="hero-rule"><span>TRUST THE PROOF</span><span>REGISTER <i/> VERIFY <i/> TRACE</span></div></section>
-    <Reveal className="story-section" ><div className="section-kicker">01 / THE TRUST GAP</div><div className="story-grid"><h2>A chain of trust<br/>for every AI artifact.</h2><div><p>Models and datasets move through versions, transformations, and training runs. A name or a promise cannot prove what changed along the way.</p><p>Provanance - AL creates a cryptographic fingerprint and connects it to provenance evidence, so others can verify the artifact they received.</p><Link to="/app" className="inline-link">Explore the platform <span>→</span></Link></div></div></Reveal>
-    <section className="how-section" id="how-it-works"><Reveal><div className="section-kicker">02 / THE WORKFLOW</div><div className="section-heading-row"><div><h2>Three steps. Clear evidence.</h2><p>Move from an artifact file to a verifiable provenance record.</p></div><Link to="/app" className="inline-link">Open the platform <span>↗</span></Link></div></Reveal><div className="steps-grid"><Reveal className="step-card"><span className="step-index">01</span><div className="step-icon">↑</div><h3>Register</h3><p>Create a SHA-256 fingerprint for a dataset or model and register its metadata.</p><span className="step-caption">ORIGIN → FINGERPRINT</span></Reveal><Reveal className="step-card"><span className="step-index">02</span><div className="step-icon">⌕</div><h3>Verify</h3><p>Upload the artifact again and compare its fingerprint against the registered proof.</p><span className="step-caption">FILE → COMPARISON</span></Reveal><Reveal className="step-card"><span className="step-index">03</span><div className="step-icon">⌁</div><h3>Trace</h3><p>Explore the available lineage and see how provenance evidence connects.</p><span className="step-caption">LINEAGE → CONTEXT</span></Reveal></div></section>
-    <Reveal className="flow-section"><div className="section-kicker">03 / BUILT FOR AI PROVENANCE</div><div className="flow-copy"><h2>Context that travels<br/>with the model.</h2><p>Trace an artifact’s journey from its data origin through processing and training to a model version. Each step can be represented as provenance evidence.</p></div><div className="flow-track"><div><span>01</span><b>Dataset</b><small>Origin</small></div><i/><div><span>02</span><b>Processing</b><small>Transformation</small></div><i/><div><span>03</span><b>Training</b><small>Run</small></div><i/><div><span>04</span><b>Model</b><small>Version</small></div></div></Reveal>
-    <Reveal className="evidence-section" id="evidence"><div className="evidence-emblem"><Mark/></div><div><div className="section-kicker">04 / EVIDENCE MODEL</div><h2>Proof on-chain.<br/>Artifacts off-chain.</h2><p>Artifact files remain off-chain. The registration flow sends a compact fingerprint and metadata to the backend, which handles registration and reports blockchain evidence when available.</p><Link to="/app" className="inline-link">See the evidence workflow <span>→</span></Link></div><div className="evidence-diagram"><div><span>YOUR ARTIFACT</span><b>Dataset or model file</b><small>Remains off-chain</small></div><i>SHA-256</i><div><span>VERIFICATION EVIDENCE</span><b>Fingerprint + metadata</b><small>Registered through the backend</small></div><div className="evidence-chain">◇ <span>Blockchain anchor when configured</span></div></div></Reveal>
-    <section className="final-cta"><div className="section-kicker">PROVANANCE - AL / TRUST INFRASTRUCTURE</div><div className="final-cta-row"><div><h2>Make AI artifacts<br/>verifiable.</h2><p>Start with a file. Leave with evidence.</p></div><Link to="/app" className="button light-button">Open Platform <span>↗</span></Link></div></section>
-    <footer className="site-footer"><Link to="/" className="site-brand"><Mark/><span>Provanance - AL<small>AI PROVENANCE INFRASTRUCTURE</small></span></Link><span>COMPSPHERE 12 / HACKSPHERE 2026</span><span>A VERIFIABLE CHAIN OF TRUST FOR AI</span></footer>
-  </main>
-}
-function Overview(){
-  const [items,setItems]=useState<Artifact[]>([]);
-  useEffect(()=>{if(!isDemoMode)return;try{const stored:unknown=JSON.parse(localStorage.getItem('provenance-demo-artifacts')||'[]');setItems(Array.isArray(stored)?stored as Artifact[]:[])}catch{setItems([])}},[]);
-  const actions=[
-    {to:'/app/register',icon:'＋',number:'01',title:'Register an artifact',copy:'Create a fingerprint and submit its metadata.',label:'Create record'},
-    {to:'/app/verify',icon:'✓',number:'02',title:'Verify an artifact',copy:'Compare a file with its registered evidence.',label:'Run verification'},
-    {to:'/app/provenance',icon:'↗',number:'03',title:'Explore provenance',copy:'Inspect the lineage returned for an artifact ID.',label:'Open lineage'}
+function Overview() {
+  const [items, setItems] = useState<Artifact[]>([]);
+  const [activityAvailable, setActivityAvailable] = useState(isDemoMode);
+  useEffect(() => {
+    if (isDemoMode) {
+      try {
+        const stored: unknown = JSON.parse(
+          localStorage.getItem("provenance-demo-artifacts") || "[]"
+        );
+        setItems(Array.isArray(stored) ? (stored as Artifact[]) : []);
+      } catch {
+        setItems([]);
+      }
+      return;
+    }
+    void getRecentArtifacts()
+      .then((items) => {
+        setItems(items);
+        setActivityAvailable(true);
+      })
+      .catch(() => setActivityAvailable(false));
+  }, []);
+  const actions = [
+    {
+      to: "/app/register",
+      icon: "＋",
+      number: "01",
+      title: "Register an artifact",
+      copy: "Create a fingerprint and submit its metadata.",
+      label: "Create record",
+    },
+    {
+      to: "/app/verify",
+      icon: "✓",
+      number: "02",
+      title: "Verify an artifact",
+      copy: "Compare a file with its registered evidence.",
+      label: "Run verification",
+    },
+    {
+      to: "/app/provenance",
+      icon: "↗",
+      number: "03",
+      title: "Explore provenance",
+      copy: "Inspect the lineage returned for an artifact ID.",
+      label: "Open lineage",
+    },
   ];
-  return <div className="app-page command-overview"><section className="command-intro"><div className="eyebrow"><span className="eyebrow-line"/> PROVANANCE WORKSPACE</div><h1>Trust your AI artifacts.</h1><p>Track where an artifact came from, verify its integrity, and inspect the provenance evidence behind it.</p><span className="workspace-mode">{isDemoMode?'DEMO MODE':'LIVE API'}</span></section><section className="command-section"><div className="command-section-heading"><span className="section-kicker">START WITH A WORKFLOW</span><h2>What do you want to do?</h2></div><div className="command-list">{actions.map(action=><Link key={action.to} to={action.to} className="command-row"><span className="command-number">{action.number}</span><span className="command-icon" aria-hidden="true">{action.icon}</span><span className="command-copy"><b>{action.title}</b><small>{action.copy}</small></span><span className="command-link">{action.label}<i>↗</i></span></Link>)}</div><div className="analysis-shortcut"><span>Analysis preview</span><p>Integrity analysis is not connected to the current API.</p><Link to="/app/analysis">View availability <i>→</i></Link></div></section><section className="activity-section"><div className="activity-heading"><div><span className="section-kicker">WORKSPACE RECORD</span><h2>Recent activity</h2></div><Link to="/app/artifacts" className="inline-link">Browse artifacts <span>→</span></Link></div>{isDemoMode&&items.length>0?<div className="activity-list">{items.slice(0,5).map(item=><Link key={item.artifactId} className="activity-row" to={`/app/artifacts/${encodeURIComponent(item.artifactId)}`}><span className="activity-marker">＋</span><span className="activity-description"><b>Artifact registered</b><small>{item.originalFilename||item.artifactType||'AI artifact'} · {item.artifactType||'Type not provided'} · {item.version||'Version not provided'}</small></span><code>{short(item.artifactId,22)}</code><time>{date(item.registeredAt)}</time><i>↗</i></Link>)}</div>:<div className="activity-empty"><span className="activity-marker">·</span><div><b>{isDemoMode?'No activity yet':'Activity history is not available'}</b><p>{isDemoMode?'Register an artifact to see its local demo record here.':'The current API does not expose recent activity or verification history.'}</p></div>{isDemoMode&&<Link to="/app/register">Register the first artifact <span>→</span></Link>}</div>}</section><section className="evidence-path"><div className="evidence-path-heading"><span className="section-kicker">THE PROVENANCE LOOP</span><h2>From artifact to verifiable evidence.</h2></div><div className="evidence-flow">{[{number:'01',name:'Artifact',label:'Source file'},{number:'02',name:'Hash',label:'SHA-256'},{number:'03',name:'Provenance',label:'Lineage record'},{number:'04',name:'Blockchain proof',label:'When available'},{number:'05',name:'Verification',label:'Compare again'}].map((step,index)=><div className="evidence-flow-step" key={step.number}><span>{step.number}</span><b>{step.name}</b><small>{step.label}</small>{index<4&&<i aria-hidden="true">→</i>}</div>)}</div><p>Files stay off-chain. The backend manages fingerprinting and reports proof details when available.</p></section></div>
+  return (
+    <div className="app-page command-overview">
+      <section className="command-intro">
+        <div className="eyebrow">
+          <span className="eyebrow-line" /> PROVENANCEAI WORKSPACE
+        </div>
+        <h1>Trust your AI artifacts.</h1>
+        <p>
+          Track where an artifact came from, verify its integrity, and inspect
+          the provenance evidence behind it.
+        </p>
+        <span className="workspace-mode">
+          {isDemoMode ? "DEMO MODE" : "LIVE API"}
+        </span>
+      </section>
+      <section className="command-section">
+        <div className="command-section-heading">
+          <span className="section-kicker">START WITH A WORKFLOW</span>
+          <h2>What do you want to do?</h2>
+        </div>
+        <div className="command-list">
+          {actions.map((action) => (
+            <Link key={action.to} to={action.to} className="command-row">
+              <span className="command-number">{action.number}</span>
+              <span className="command-icon" aria-hidden="true">
+                {action.icon}
+              </span>
+              <span className="command-copy">
+                <b>{action.title}</b>
+                <small>{action.copy}</small>
+              </span>
+              <span className="command-link">
+                {action.label}
+                <i>↗</i>
+              </span>
+            </Link>
+          ))}
+        </div>
+        <div className="analysis-shortcut">
+          <span>Analysis preview</span>
+          <p>Load deterministic provenance signals from the connected API.</p>
+          <Link to="/app/analysis">
+            Open analysis <i>→</i>
+          </Link>
+        </div>
+      </section>
+      <section className="activity-section">
+        <div className="activity-heading">
+          <div>
+            <span className="section-kicker">WORKSPACE RECORD</span>
+            <h2>Recent activity</h2>
+          </div>
+          <Link to="/app/artifacts" className="inline-link">
+            Browse artifacts <span>→</span>
+          </Link>
+        </div>
+        {items.length > 0 ? (
+          <div className="activity-list">
+            {items.slice(0, 5).map((item) => (
+              <Link
+                key={item.artifactId}
+                className="activity-row"
+                to={`/app/artifacts/${encodeURIComponent(item.artifactId)}`}
+              >
+                <span className="activity-marker">＋</span>
+                <span className="activity-description">
+                  <b>Artifact registered</b>
+                  <small>
+                    {item.originalFilename ||
+                      item.artifactType ||
+                      "AI artifact"}{" "}
+                    · {item.artifactType || "Type not provided"} ·{" "}
+                    {item.version || "Version not provided"}
+                  </small>
+                </span>
+                <code>{short(item.artifactId, 22)}</code>
+                <time>{date(item.registeredAt)}</time>
+                <i>↗</i>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="activity-empty">
+            <span className="activity-marker">·</span>
+            <div>
+              <b>
+                {isDemoMode
+                  ? "No activity yet"
+                  : activityAvailable
+                  ? "No recent registrations"
+                  : "Activity history is not available"}
+              </b>
+              <p>
+                {isDemoMode
+                  ? "Register an artifact to see its local demo record here."
+                  : activityAvailable
+                  ? "No persistent registrations have been returned yet."
+                  : "Configure Firestore persistence to enable durable activity history."}
+              </p>
+            </div>
+            {isDemoMode && (
+              <Link to="/app/register">
+                Register the first artifact <span>→</span>
+              </Link>
+            )}
+          </div>
+        )}
+      </section>
+      <section className="evidence-path">
+        <div className="evidence-path-heading">
+          <span className="section-kicker">THE PROVENANCE LOOP</span>
+          <h2>From artifact to verifiable evidence.</h2>
+        </div>
+        <div className="evidence-flow">
+          {[
+            { number: "01", name: "Artifact", label: "Source file" },
+            { number: "02", name: "Hash", label: "SHA-256" },
+            { number: "03", name: "Provenance", label: "Lineage record" },
+            { number: "04", name: "Blockchain proof", label: "When available" },
+            { number: "05", name: "Verification", label: "Compare again" },
+          ].map((step, index) => (
+            <div className="evidence-flow-step" key={step.number}>
+              <span>{step.number}</span>
+              <b>{step.name}</b>
+              <small>{step.label}</small>
+              {index < 4 && <i aria-hidden="true">→</i>}
+            </div>
+          ))}
+        </div>
+        <p>
+          Files stay off-chain. The backend manages fingerprinting and reports
+          proof details when available.
+        </p>
+      </section>
+    </div>
+  );
 }
-function ArtifactsPage(){
-  const [items,setItems]=useState<Artifact[]>([]);const [id,setId]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);const navigate=useNavigate();
-  useEffect(()=>{if(!isDemoMode)return;try{const stored:unknown=JSON.parse(localStorage.getItem('provenance-demo-artifacts')||'[]');setItems(Array.isArray(stored)?stored as Artifact[]:[])}catch{setItems([])}},[]);
-  async function lookup(event?:FormEvent){event?.preventDefault();const value=id.trim();if(!value)return;setBusy(true);setError('');try{await getArtifact(value);navigate(`/app/artifacts/${encodeURIComponent(value)}`)}catch(error){setError(error instanceof Error?error.message:'Could not find that artifact.')}finally{setBusy(false)}}
-  return <div className="app-page artifacts-workspace"><div className="page-title"><div><div className="eyebrow">ARTIFACT REGISTRY</div><h1>Artifacts</h1><p>Registered identities and their cryptographic evidence.</p></div><Link className="button primary" to="/app/register">＋ Register artifact</Link></div>{isDemoMode?<section className="registry-section"><div className="registry-heading"><div><span className="section-kicker">LOCAL DEMO RECORDS</span><h2>Artifact registry</h2></div><span className="mode-pill">DEMO DATA</span></div>{items.length>0?<div className="registry-table-wrap"><table className="registry-table"><thead><tr><th>Artifact</th><th>Type</th><th>Version</th><th>SHA-256</th><th>Registered</th><th>Status</th><th>Action</th></tr></thead><tbody>{items.map(item=><tr key={item.artifactId}><td><Link className="registry-name" to={`/app/artifacts/${encodeURIComponent(item.artifactId)}`}><b>{item.originalFilename||'AI artifact'}</b><small>{short(item.artifactId,24)}</small></Link></td><td>{item.artifactType||'—'}</td><td>{item.version||'—'}</td><td><code>{short(item.fingerprint,22)}</code></td><td>{date(item.registeredAt)}</td><td><span className="registry-status"><i/> Registered · demo</span></td><td><Link className="registry-action" to={`/app/artifacts/${encodeURIComponent(item.artifactId)}`}>View record ↗</Link></td></tr>)}</tbody></table></div>:<div className="registry-empty"><span>＋</span><h2>No artifacts registered yet.</h2><p>Register your first dataset or model to create a verifiable identity.</p><Link to="/app/register" className="inline-link">Register an artifact <span>→</span></Link></div>}</section>:<section className="registry-lookup"><div><span className="section-kicker">OPEN A RECORD</span><h2>Look up by artifact ID</h2><p>The connected API does not expose an artifact-list endpoint. Use a known ID to retrieve its details.</p><form onSubmit={lookup}><label htmlFor="artifact-id-lookup">Artifact ID</label><div><input id="artifact-id-lookup" value={id} onChange={event=>setId(event.target.value)} placeholder="Paste an artifact ID" required/><button className="button primary" disabled={busy}>{busy?'Opening…':'Open record'} <span>→</span></button></div>{error&&<p className="form-error" role="alert">{error}<button type="button" onClick={()=>void lookup()}>Retry</button></p>}</form></div><aside><span>API CAPABILITY</span><b>Artifact detail lookup</b><small>Collection listing is not available in the current API.</small></aside></section>}</div>
-}
-function ProvenancePage(){
-  const [search,setSearch]=useSearchParams();const [id,setId]=useState(search.get('artifactId')||'');const [graph,setGraph]=useState<Provenance>();const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [selected,setSelected]=useState('');
-  async function loadGraph(value=id.trim()){if(!value)return;setBusy(true);setError('');setGraph(undefined);setSelected('');setSearch({artifactId:value});try{const result=await getProvenance(value);setGraph(result);setSelected(result.nodes[0]?.id||'')}catch(error){setError(error instanceof Error?error.message:'Provenance could not be loaded.')}finally{setBusy(false)}}
-  useEffect(()=>{const initial=search.get('artifactId');if(initial){setId(initial);void loadGraph(initial)}},[]);
-  async function submit(event:FormEvent){event.preventDefault();await loadGraph()}
-  const chosen=graph?.nodes.find(node=>node.id===selected);
-  return <div className="app-page provenance-workspace"><div className="page-title"><div><div className="eyebrow">PROVENANCE EXPLORER</div><h1>Every artifact has a history.</h1><p>Trace the returned origin, transformation, training, and model evidence for an artifact.</p></div></div><form className="provenance-search" onSubmit={submit}><label htmlFor="lineage-artifact-id">ARTIFACT ID</label><input id="lineage-artifact-id" value={id} onChange={event=>setId(event.target.value)} placeholder="Enter a registered artifact ID" required/><button className="button primary" disabled={busy}>{busy?'Loading evidence…':'Load provenance'} <span>→</span></button></form>{error&&<div className="provenance-error" role="alert"><span>!</span><p>{error}</p><button className="button secondary" type="button" onClick={()=>void loadGraph()}>Retry</button></div>}{busy&&<div className="lineage-loading"><span className="spinner"/> Retrieving provenance evidence…</div>}{graph&&<section className="lineage-product"><header className="lineage-header"><div><span className="section-kicker">EVIDENCE GRAPH</span><h2>{graph.nodes.length} recorded step{graph.nodes.length===1?'':'s'}</h2><p>Connections are shown only when returned by the provenance service.</p></div><Link className="lineage-artifact-link" to={`/app/artifacts/${encodeURIComponent(id)}`}>Artifact record ↗</Link></header><div className="lineage-layout"><div className="lineage-graph-panel"><div className="lineage-axis"><span>ORIGIN</span><i/><span>TRANSFORMATION</span><i/><span>MODEL</span><i/><span>PROOF</span></div><Graph data={graph} selectedId={selected} onSelect={setSelected} orientation="horizontal"/></div><aside className="lineage-details"><div className="lineage-detail-top"><span className="section-kicker">SELECTED NODE</span><span className="detail-index">{String(Math.max(0,graph.nodes.findIndex(node=>node.id===selected))+1).padStart(2,'0')}</span></div>{chosen?<><h3>{chosen.label||chosen.name||chosen.type||'Provenance step'}</h3><dl><div><dt>Node type</dt><dd>{chosen.type||'Not provided'}</dd></div><div><dt>Version</dt><dd>{chosen.version||'Not provided'}</dd></div><div><dt>Timestamp</dt><dd>{date(chosen.timestamp)}</dd></div><div><dt>Status</dt><dd>{chosen.status||'Not provided'}</dd></div><div><dt>Record ID</dt><dd className="mono-value">{chosen.id}</dd></div></dl></>:<p>Select a node to inspect its evidence.</p>}<span className="lineage-note">Only data returned by the provenance API is shown. Missing steps are not inferred.</span></aside></div></section>}{!graph&&!busy&&!error&&<div className="lineage-empty"><span>⌁</span><div><h2>Explore an artifact’s history</h2><p>Enter an artifact ID to load its available provenance nodes and relationships.</p></div></div>}</div>
-}
-function AnalysisPage(){
-  const [search,setSearch]=useSearchParams();
-  const [id,setId]=useState(search.get('artifactId')||'');
-  const [provenance,setProvenance]=useState<Provenance>();
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState('');
-  async function load(value=id.trim()){
-    if(!value)return;
-    setBusy(true);setError('');setProvenance(undefined);setSearch({artifactId:value});
-    try{setProvenance(await getProvenance(value))}catch(failure){setError(failure instanceof Error?failure.message:'Analysis evidence could not be loaded.')}finally{setBusy(false)}
+function ArtifactsPage() {
+  const [items, setItems] = useState<Artifact[]>([]);
+  const [id, setId] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!isDemoMode) return;
+    try {
+      const stored: unknown = JSON.parse(
+        localStorage.getItem("provenance-demo-artifacts") || "[]"
+      );
+      setItems(Array.isArray(stored) ? (stored as Artifact[]) : []);
+    } catch {
+      setItems([]);
+    }
+  }, []);
+  async function lookup(event?: FormEvent) {
+    event?.preventDefault();
+    const value = id.trim();
+    if (!value) return;
+    setBusy(true);
+    setError("");
+    try {
+      await getArtifact(value);
+      navigate(`/app/artifacts/${encodeURIComponent(value)}`);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Could not find that artifact."
+      );
+    } finally {
+      setBusy(false);
+    }
   }
-  useEffect(()=>{const initial=search.get('artifactId');if(initial){setId(initial);void load(initial)}},[]);
-  const analysis=provenance?.analysis;
-  return <div className="app-page analysis-workspace"><div className="page-title"><div><div className="eyebrow">INTEGRITY SIGNALS</div><h1>AI Analysis</h1><p>Understand the provenance signals reported for a registered artifact.</p></div></div>
-    <form className="provenance-search" onSubmit={event=>{event.preventDefault();void load()}}><label htmlFor="analysis-artifact-id">ARTIFACT ID</label><input id="analysis-artifact-id" value={id} onChange={event=>setId(event.target.value)} placeholder="Enter a registered artifact ID" required/><button className="button primary" disabled={busy}>{busy?'Loading analysis…':'Load analysis'} <span>→</span></button></form>
-    {error&&<div className="provenance-error" role="alert"><span>!</span><p>{error}</p><button className="button secondary" type="button" onClick={()=>void load()}>Retry</button></div>}
-    {busy&&<div className="lineage-loading"><span className="spinner"/> Retrieving analysis evidence…</div>}
-    {analysis?<section className="analysis-state"><div className="analysis-state-head"><span className="analysis-state-icon">◇</span><div><span className="section-kicker">BACKEND ANALYSIS</span><h2>{analysis.riskLevel} risk · {analysis.severity} severity</h2><p>{analysis.explanation}</p></div><span className="preview-status">REPORTED</span></div><div className="analysis-honesty"><b>Risk score: {analysis.riskScore}</b><p>Reported by the provenance analysis service. This score does not independently prove the supplied training history is factual.</p></div><div className="analysis-signal-list">{analysis.issues.length?analysis.issues.map((issue,index)=><div key={`${issue.code}-${issue.affectedNodeId||'none'}-${index}`}><span>{String(index+1).padStart(2,'0')}</span><b>{issue.code.replace(/_/g,' ')}</b><small>{issue.message}{issue.affectedField?` · Field: ${issue.affectedField}`:''}</small><i>{issue.severity}{issue.affectedNodeId?` · ${short(issue.affectedNodeId,20)}`:''}</i></div>):<div><span>✓</span><b>No configured consistency issues reported</b><small>The service returned no issue entries for this artifact.</small><i>NONE</i></div>}</div></section>:!busy&&!error&&<section className="analysis-state"><div className="analysis-state-head"><span className="analysis-state-icon">◇</span><div><span className="section-kicker">ANALYSIS SERVICE</span><h2>{provenance?'Analysis unavailable':'Select an artifact'}</h2><p>{provenance?'The provenance API returned graph data without an analysis payload. No findings or risk score are inferred.':'Enter an artifact ID to request its provenance analysis from the API.'}</p></div><span className="preview-status">{provenance?'NOT RETURNED':'READY'}</span></div><div className="analysis-honesty"><b>Evidence before conclusions</b><p>Risk level, score, and detected issues appear only when the backend returns them.</p></div></section>}
-    {provenance&&<div className="analysis-footer"><Link to={`/app/provenance?artifactId=${encodeURIComponent(id)}`} className="inline-link">Explore provenance graph <span>→</span></Link><span>{provenance.nodes.length} GRAPH NODES</span></div>}
-  </div>
+  return (
+    <div className="app-page artifacts-workspace">
+      <div className="page-title">
+        <div>
+          <div className="eyebrow">ARTIFACT REGISTRY</div>
+          <h1>Artifacts</h1>
+          <p>Registered identities and their cryptographic evidence.</p>
+        </div>
+        <Link className="button primary" to="/app/register">
+          ＋ Register artifact
+        </Link>
+      </div>
+      {isDemoMode ? (
+        <section className="registry-section">
+          <div className="registry-heading">
+            <div>
+              <span className="section-kicker">LOCAL DEMO RECORDS</span>
+              <h2>Artifact registry</h2>
+            </div>
+            <span className="mode-pill">DEMO DATA</span>
+          </div>
+          {items.length > 0 ? (
+            <div className="registry-table-wrap">
+              <table className="registry-table">
+                <thead>
+                  <tr>
+                    <th>Artifact</th>
+                    <th>Type</th>
+                    <th>Version</th>
+                    <th>SHA-256</th>
+                    <th>Registered</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.artifactId}>
+                      <td>
+                        <Link
+                          className="registry-name"
+                          to={`/app/artifacts/${encodeURIComponent(
+                            item.artifactId
+                          )}`}
+                        >
+                          <b>{item.originalFilename || "AI artifact"}</b>
+                          <small>{short(item.artifactId, 24)}</small>
+                        </Link>
+                      </td>
+                      <td>{item.artifactType || "—"}</td>
+                      <td>{item.version || "—"}</td>
+                      <td>
+                        <code>{short(item.fingerprint, 22)}</code>
+                      </td>
+                      <td>{date(item.registeredAt)}</td>
+                      <td>
+                        <span className="registry-status">
+                          <i /> Registered · demo
+                        </span>
+                      </td>
+                      <td>
+                        <Link
+                          className="registry-action"
+                          to={`/app/artifacts/${encodeURIComponent(
+                            item.artifactId
+                          )}`}
+                        >
+                          View record ↗
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="registry-empty">
+              <span>＋</span>
+              <h2>No artifacts registered yet.</h2>
+              <p>
+                Register your first dataset or model to create a verifiable
+                identity.
+              </p>
+              <Link to="/app/register" className="inline-link">
+                Register an artifact <span>→</span>
+              </Link>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="registry-lookup">
+          <div>
+            <span className="section-kicker">OPEN A RECORD</span>
+            <h2>Look up by artifact ID</h2>
+            <p>
+              The connected API does not expose an artifact-list endpoint. Use a
+              known ID to retrieve its details.
+            </p>
+            <form onSubmit={lookup}>
+              <label htmlFor="artifact-id-lookup">Artifact ID</label>
+              <div>
+                <input
+                  id="artifact-id-lookup"
+                  value={id}
+                  onChange={(event) => setId(event.target.value)}
+                  placeholder="Paste an artifact ID"
+                  required
+                />
+                <button className="button primary" disabled={busy}>
+                  {busy ? "Opening…" : "Open record"} <span>→</span>
+                </button>
+              </div>
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                  <button type="button" onClick={() => void lookup()}>
+                    Retry
+                  </button>
+                </p>
+              )}
+            </form>
+          </div>
+          <aside>
+            <span>API CAPABILITY</span>
+            <b>Artifact detail lookup</b>
+            <small>
+              Collection listing is not available in the current API.
+            </small>
+          </aside>
+        </section>
+      )}
+    </div>
+  );
 }
-function LegacyArtifactRedirect(){const {id=''}=useParams();return <Navigate to={`/app/artifacts/${encodeURIComponent(id)}`} replace/>}
-function Graph({data,onSelect,selectedId,orientation='vertical'}:{data?:Provenance;onSelect?:(id:string)=>void;selectedId?:string;orientation?:'vertical'|'horizontal'}){const nodes=data?.nodes||[];const relationships=data?.relationships||data?.edges?.map(edge=>({from:edge.source,to:edge.target,relationship:edge.type}))||[];return <div className={`graph ${orientation==='horizontal'?'graph-horizontal':''}`}>{nodes.length===0?<div className="empty-graph">No provenance nodes were returned for this artifact.</div>:nodes.map((node,index)=><div className="graph-row" key={node.id}><button type="button" aria-label={`Select ${node.label||node.name||node.type||'provenance node'}`} aria-pressed={selectedId===node.id} className={`graph-node ${index===0?'origin':''} ${selectedId===node.id?'selected':''}`} onClick={()=>onSelect?.(node.id)}><span className="node-symbol">{index===0?'◉':index===nodes.length-1?'⬡':'◇'}</span><span className="node-main"><small>{node.type||'PROVENANCE STEP'}</small><b>{node.label||node.name||node.type||'Provenance step'} {node.version&&<em>{node.version}</em>}</b><span>{date(node.timestamp)}</span></span><span className="node-status"><i/> {node.status||'Status not provided'}</span></button>{index<nodes.length-1&&relationships.some(edge=>edge.from===node.id&&edge.to===nodes[index+1].id)&&<div className="graph-link"><span/></div>}</div>)}</div>}
-function Register(){
-  const [file,setFile]=useState<File>();const fileInput=useRef<HTMLInputElement>(null);const [type,setType]=useState('dataset');const [version,setVersion]=useState('v1');const [uri,setUri]=useState('');const [step,setStep]=useState<1|2|3>(1);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [created,setCreated]=useState<Artifact>();
-  async function submit(event:FormEvent){event.preventDefault();if(!file)return;setBusy(true);setError('');try{setCreated(await registerArtifact(file,{artifactType:type,version,metadataUri:uri}));}catch(error){setError(error instanceof Error?error.message:'Registration failed.')}finally{setBusy(false)}}
-  const pickFile=(next?:File)=>{setFile(next);if(fileInput.current)fileInput.current.value='';setError('')};
-  function handleDrop(event:DragEvent<HTMLLabelElement>){event.preventDefault();pickFile(event.dataTransfer.files[0])}
-  return <div className="app-page registration-workspace"><div className="page-title"><div><div className="eyebrow">ARTIFACT REGISTRATION</div><h1>Register Artifact</h1><p>Create a verifiable identity for an AI artifact.</p></div></div>{created?<><div className="registered-heading"><span className="registered-check">✓</span><div><div className="eyebrow">REGISTRATION RESPONSE</div><h2>Artifact Registered</h2><p>Values below are from the configured {isDemoMode?'demo service':'API'} response.</p></div></div><section className="registered-summary card"><div className="registered-id"><span>ARTIFACT ID</span><b>{created.artifactId}</b></div><div className="registered-fingerprint"><span>SHA-256 FINGERPRINT</span><code>{created.fingerprint||'Not returned'}</code></div><dl className="registered-fields"><div><dt>Version</dt><dd>{created.version||'Not returned'}</dd></div><div><dt>Type</dt><dd>{created.artifactType||'Not returned'}</dd></div><div><dt>Registration time</dt><dd>{date(created.registeredAt)}</dd></div><div><dt>Network</dt><dd>{created.network||created.chainId||'Not returned'}</dd></div><div><dt>Blockchain status</dt><dd>{created.transactionHash?'Transaction hash returned':'Not returned'}</dd></div><div><dt>Transaction hash</dt><dd className="mono-value">{created.transactionHash||'Not returned'}</dd></div></dl><div className="registered-actions"><Link className="button primary" to={`/app/artifacts/${encodeURIComponent(created.artifactId)}`}>View Artifact <span>↗</span></Link><Link className="button secondary" to={`/app/provenance?artifactId=${encodeURIComponent(created.artifactId)}`}>View Provenance <span>→</span></Link><button className="button quiet" onClick={()=>{setCreated(undefined);setFile(undefined);setStep(1)}}>Register another</button></div></section></>:<><div className="registration-steps" aria-label="Registration progress">{(['UPLOAD ARTIFACT','ARTIFACT DETAILS','REVIEW'] as const).map((label,index)=><button type="button" key={label} className={step===index+1?'current':''} onClick={()=>{if(index===0||file&&index===1) setStep((index+1) as 1|2|3)}}><span>0{index+1}</span>{label}</button>)}</div><form className="registration-card card" onSubmit={submit}>{step===1&&<section className="registration-stage"><div className="stage-heading"><span>STEP 01</span><h2>Upload artifact</h2><p>Select the dataset, model, or file you want to register.</p></div><label className={`dropzone registration-drop ${file?'has-file':''}`} onDragOver={event=>event.preventDefault()} onDrop={handleDrop}><input ref={fileInput} type="file" onChange={event=>pickFile(event.target.files?.[0])}/><span className="upload-icon">↑</span>{file?<><b>{file.name}</b><span>{size(file.size)} · Selected for registration</span><small>Choose a different file to replace this selection.</small></>:<><b>Drop your artifact here</b><span>or <u>browse files</u> from your device</span><small>Your artifact file remains off-chain.</small></>}</label>{file&&<div className="file-selection"><span className="file-icon">{type==='dataset'?'▤':'⬡'}</span><span><b>{file.name}</b><small>{size(file.size)} · {type}</small></span><button type="button" className="text-button" onClick={()=>pickFile(undefined)}>Remove file</button></div>}<div className="stage-actions"><span>Supported: dataset, model, or other artifact</span><button type="button" className="button primary" disabled={!file} onClick={()=>setStep(2)}>Continue to details <span>→</span></button></div></section>}{step===2&&<section className="registration-stage"><div className="stage-heading"><span>STEP 02</span><h2>Artifact details</h2><p>Add the metadata that identifies this artifact version.</p></div><div className="details-fields"><label><span className="field-label">ARTIFACT TYPE</span><select value={type} onChange={event=>setType(event.target.value)}><option value="dataset">Dataset</option><option value="model">Model</option><option value="other">Other</option></select></label><label><span className="field-label">VERSION</span><input value={version} onChange={event=>setVersion(event.target.value)} placeholder="e.g. v1" required/></label><label className="metadata-field"><span className="field-label">METADATA URI <span>Optional</span></span><input value={uri} onChange={event=>setUri(event.target.value)} placeholder="local://provenance-reference"/><small>Reference metadata associated with this artifact.</small></label></div><div className="stage-actions"><button type="button" className="button secondary" onClick={()=>setStep(1)}>← Back to upload</button><button type="button" className="button primary" disabled={!version.trim()} onClick={()=>setStep(3)}>Review registration <span>→</span></button></div></section>}{step===3&&<section className="registration-stage"><div className="stage-heading"><span>STEP 03</span><h2>Review registration</h2><p>Confirm the file and metadata before sending them to the registration API.</p></div><dl className="review-list"><div><dt>Artifact file</dt><dd>{file?.name||'No file selected'} <small>{file?size(file.size):''}</small></dd></div><div><dt>Artifact type</dt><dd>{type}</dd></div><div><dt>Version</dt><dd>{version||'Not provided'}</dd></div><div><dt>Metadata URI</dt><dd>{uri||'Not provided'}</dd></div><div><dt>Evidence handling</dt><dd>Fingerprint and metadata submitted to backend</dd></div></dl>{error&&<div className="form-error">⚠ {error}</div>}<div className="stage-actions"><button type="button" className="button secondary" onClick={()=>setStep(2)}>← Edit details</button><button type="submit" className="button primary" disabled={!file||busy}>{busy?<><span className="spinner"/>Registering artifact…</>:<>Register Artifact <span>↗</span></>}</button></div><p className="privacy"><span>◇</span> Your artifact file stays off-chain. Registration values are returned by the backend.</p></section>}</form><aside className="registration-aside"><div className="section-kicker">EVIDENCE MODEL</div><h3>Artifact files<br/>stay off-chain.</h3><p>The backend handles fingerprinting and submits the registration request. This page does not calculate blockchain data.</p><div className="registration-aside-flow"><span>FILE</span><i>→</i><span>FINGERPRINT</span><i>→</i><span>RECORD</span></div><small>Never enter wallet keys or secrets here.</small></aside></>}</div>
+function AnalysisSummary({ analysis }: { analysis: Provenance["analysis"] }) {
+  if (!analysis) return null;
+  return (
+    <section className="analysis-state provenance-analysis">
+      <div className="analysis-state-head">
+        <span className="analysis-state-icon">◇</span>
+        <div>
+          <span className="section-kicker">
+            DETERMINISTIC PROVENANCE ANALYSIS
+          </span>
+          <h2>
+            {analysis.riskLevel} risk · score {analysis.riskScore} ·{" "}
+            {analysis.severity} severity
+          </h2>
+          <p>{analysis.explanation}</p>
+        </div>
+        <span className="preview-status">BACKEND REPORTED</span>
+      </div>
+      <div className="analysis-signal-list">
+        {analysis.issues.length ? (
+          analysis.issues.map((issue, index) => (
+            <div
+              key={`${issue.code}-${issue.affectedNodeId || "none"}-${index}`}
+            >
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <b>{issue.code.replace(/_/g, " ")}</b>
+              <small>
+                {issue.message}
+                {issue.affectedField ? ` · Field: ${issue.affectedField}` : ""}
+              </small>
+              <i>{issue.severity}</i>
+            </div>
+          ))
+        ) : (
+          <div>
+            <span>✓</span>
+            <b>No configured consistency issues reported</b>
+            <small>
+              The backend returned a complete metadata lineage without
+              configured rule violations.
+            </small>
+            <i>NONE</i>
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
-function Verify(){
-  const [search]=useSearchParams();const [id,setId]=useState(search.get('artifactId')||'');const [file,setFile]=useState<File>();const [busy,setBusy]=useState(false);const [result,setResult]=useState<Verification>();const [error,setError]=useState('');
-  async function submit(event:FormEvent){event.preventDefault();if(!file||!id.trim())return;setBusy(true);setError('');setResult(undefined);try{setResult(await verifyArtifact(file,id.trim()))}catch(error){setError(error instanceof Error?error.message:'Verification failed.')}finally{setBusy(false)}}
-  function handleDrop(event:DragEvent<HTMLLabelElement>){event.preventDefault();const dropped=event.dataTransfer.files[0];if(dropped)setFile(dropped)}
-  return <div className="app-page verification-workspace"><div className="page-title"><div><div className="eyebrow">INDEPENDENT VERIFICATION</div><h1>Verify Artifact</h1><p>Confirm that an artifact matches its registered fingerprint.</p></div></div><div className="verify-layout"><form className="card verify-form" onSubmit={submit}><div className="verify-lock">⌕</div><h2>Verify artifact integrity</h2><p>Upload the original artifact and provide its registered ID. The backend recalculates and compares its fingerprint.</p><label><span className="field-label">ARTIFACT ID <span>Required</span></span><input value={id} onChange={event=>setId(event.target.value)} placeholder="Paste the registered artifact ID" required/></label><label className={`dropzone verify-drop ${file?'has-file':''}`} onDragOver={event=>event.preventDefault()} onDrop={handleDrop}><input type="file" onChange={event=>setFile(event.target.files?.[0])}/><span className="upload-icon">↑</span>{file?<><b>{file.name}</b><span>{size(file.size)} · Ready for verification</span></>:<><b>Choose the artifact to verify</b><span>or <u>browse files</u></span></>}</label>{file&&<button type="button" className="text-button file-remove" onClick={()=>setFile(undefined)}>Remove selected file</button>}{error&&<div className="form-error">⚠ {error}</div>}<button className="button primary submit" disabled={!file||!id.trim()||busy}>{busy?<><span className="spinner"/>Verifying artifact…</>:<>Verify Integrity <span>⌕</span></>}</button><div className="privacy"><span>◇</span> Verification uses the configured backend service.</div></form><div className="verify-side">{busy?<div className="verify-progress card"><span className="spinner"/><h2>Verifying artifact…</h2><p>Calculating fingerprint and comparing registered evidence.</p></div>:result?<div className={`verification-result ${result.verified?'pass':'fail'}`}><div className="result-symbol">{result.verified?'✓':'×'}</div><div className="eyebrow">{result.verified?'INTEGRITY CONFIRMED':'MISMATCH DETECTED'}</div><h2>{result.verified?'VERIFIED':'VERIFICATION FAILED'}</h2><p>{result.message|| (result.verified?'The uploaded artifact matches the registered fingerprint.':'The uploaded artifact does not match the registered fingerprint.')}</p><div className="result-lines"><span>ARTIFACT ID<b>{result.artifactId||'Not returned'}</b></span><span>CALCULATED FINGERPRINT<code>{result.uploadedHash||result.calculatedHash||'Not returned'}</code></span><span>EXPECTED FINGERPRINT<code>{result.registeredHash||result.expectedHash||'Not returned'}</code></span></div></div>:<div className="verify-explainer"><div className="eyebrow">INDEPENDENT INTEGRITY CHECK</div><h2>Compare the file<br/>with its evidence.</h2><p>The backend evaluates the uploaded artifact against its registered fingerprint and returns the verification result.</p><div className="explainer-note"><span>i</span> A change to the file contents should produce a different fingerprint.</div></div>}</div></div></div>
+function ProvenancePage() {
+  const [search, setSearch] = useSearchParams();
+  const [id, setId] = useState(search.get("artifactId") || "");
+  const [graph, setGraph] = useState<Provenance>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState("");
+  async function loadGraph(value = id.trim()) {
+    if (!value) return;
+    setBusy(true);
+    setError("");
+    setGraph(undefined);
+    setSelected("");
+    setSearch({ artifactId: value });
+    try {
+      const result = await getProvenance(value);
+      setGraph(result);
+      setSelected(result.nodes[0]?.id || "");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Provenance could not be loaded."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    const initial = search.get("artifactId");
+    if (initial) {
+      setId(initial);
+      void loadGraph(initial);
+    }
+  }, []);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await loadGraph();
+  }
+  const chosen = graph?.nodes.find((node) => node.id === selected);
+  return (
+    <div className="app-page provenance-workspace">
+      <div className="page-title">
+        <div>
+          <div className="eyebrow">PROVENANCE EXPLORER</div>
+          <h1>Every artifact has a history.</h1>
+          <p>
+            Trace the returned origin, transformation, training, and model
+            evidence for an artifact.
+          </p>
+        </div>
+      </div>
+      <form className="provenance-search" onSubmit={submit}>
+        <label htmlFor="lineage-artifact-id">ARTIFACT ID</label>
+        <input
+          id="lineage-artifact-id"
+          value={id}
+          onChange={(event) => setId(event.target.value)}
+          placeholder="Enter a registered artifact ID"
+          required
+        />
+        <button className="button primary" disabled={busy}>
+          {busy ? "Loading evidence…" : "Load provenance"} <span>→</span>
+        </button>
+      </form>
+      {error && (
+        <div className="provenance-error" role="alert">
+          <span>!</span>
+          <p>{error}</p>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => void loadGraph()}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {busy && (
+        <div className="lineage-loading">
+          <span className="spinner" /> Retrieving provenance evidence…
+        </div>
+      )}
+      {graph && (
+        <>
+          <AnalysisSummary analysis={graph.analysis!} />
+          <section className="lineage-product">
+            <header className="lineage-header">
+              <div>
+                <span className="section-kicker">EVIDENCE GRAPH</span>
+                <h2>
+                  {graph.nodes.length} recorded step
+                  {graph.nodes.length === 1 ? "" : "s"}
+                </h2>
+                <p>
+                  Connections are shown only when returned by the provenance
+                  service.
+                </p>
+              </div>
+              <Link
+                className="lineage-artifact-link"
+                to={`/app/artifacts/${encodeURIComponent(id)}`}
+              >
+                Artifact record ↗
+              </Link>
+            </header>
+            <div className="lineage-layout">
+              <div className="lineage-graph-panel">
+                <div className="lineage-axis">
+                  <span>ORIGIN</span>
+                  <i />
+                  <span>TRANSFORMATION</span>
+                  <i />
+                  <span>MODEL</span>
+                  <i />
+                  <span>PROOF</span>
+                </div>
+                <Graph
+                  data={graph}
+                  selectedId={selected}
+                  onSelect={setSelected}
+                  orientation="horizontal"
+                />
+              </div>
+              <aside className="lineage-details">
+                <div className="lineage-detail-top">
+                  <span className="section-kicker">SELECTED NODE</span>
+                  <span className="detail-index">
+                    {String(
+                      Math.max(
+                        0,
+                        graph.nodes.findIndex((node) => node.id === selected)
+                      ) + 1
+                    ).padStart(2, "0")}
+                  </span>
+                </div>
+                {chosen ? (
+                  <>
+                    <h3>
+                      {chosen.label ||
+                        chosen.name ||
+                        chosen.type ||
+                        "Provenance step"}
+                    </h3>
+                    <dl>
+                      <div>
+                        <dt>Node type</dt>
+                        <dd>{chosen.type || "Not provided"}</dd>
+                      </div>
+                      <div>
+                        <dt>Version</dt>
+                        <dd>{chosen.version || "Not provided"}</dd>
+                      </div>
+                      <div>
+                        <dt>Timestamp</dt>
+                        <dd>{date(chosen.timestamp)}</dd>
+                      </div>
+                      <div>
+                        <dt>Status</dt>
+                        <dd>{chosen.status || "Not provided"}</dd>
+                      </div>
+                      <div>
+                        <dt>Record ID</dt>
+                        <dd className="mono-value">{chosen.id}</dd>
+                      </div>
+                    </dl>
+                  </>
+                ) : (
+                  <p>Select a node to inspect its evidence.</p>
+                )}
+                <span className="lineage-note">
+                  Only data returned by the provenance API is shown. Missing
+                  steps are not inferred.
+                </span>
+              </aside>
+            </div>
+          </section>
+        </>
+      )}
+      {!graph && !busy && !error && (
+        <div className="lineage-empty">
+          <span>⌁</span>
+          <div>
+            <h2>Explore an artifact’s history</h2>
+            <p>
+              Enter an artifact ID to load its available provenance nodes and
+              relationships.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
-function Details(){
-  const {id=''}=useParams();const [a,setA]=useState<Artifact>();const [graph,setGraph]=useState<Provenance>();const [error,setError]=useState('');const [attempt,setAttempt]=useState(0);
-  useEffect(()=>{let active=true;setA(undefined);setGraph(undefined);setError('');getArtifact(id).then(artifact=>{if(active)setA(artifact)}).catch(error=>{if(active)setError(error instanceof Error?error.message:'Unable to load artifact.')});getProvenance(id).then(lineage=>{if(active)setGraph(lineage)}).catch(()=>{if(active)setGraph(undefined)});return()=>{active=false}},[id,attempt]);
-  if(error)return <div className="card not-found"><div className="eyebrow">ARTIFACT UNAVAILABLE</div><h2>We couldn’t load this artifact.</h2><p>{error}</p><div className="hero-actions"><button className="button primary" onClick={()=>setAttempt(value=>value+1)}>Retry <span>↻</span></button><Link to="/app/artifacts" className="button secondary">Back to artifacts</Link></div></div>;
-  if(!a)return <div className="loading-page"><span className="spinner"/> Loading artifact evidence…</div>;
-  return <div className="app-page detail-workspace"><div className="detail-back"><Link to="/app/artifacts">← Artifacts</Link><span> / </span>{a.artifactId}</div><div className="page-title detail-title"><div><div className="eyebrow">ARTIFACT RECORD</div><h1>{a.originalFilename||a.artifactType||'AI artifact'}</h1><p>{a.artifactType||'Type not provided'} <span>·</span> Version {a.version||'Not provided'} <span>·</span> Registered {date(a.registeredAt)}</p></div><Link className="button primary" to={`/app/verify?artifactId=${encodeURIComponent(a.artifactId)}`}>Verify Artifact <span>→</span></Link></div><section className="detail-overview"><div><span>ARTIFACT ID</span><b>{a.artifactId}</b></div><div><span>TYPE</span><b>{a.artifactType||'Not provided'}</b></div><div><span>VERSION</span><b>{a.version||'Not provided'}</b></div><div><span>REGISTRATION</span><b><i className="registered-indicator"/> Registered</b></div></section><div className="detail-content-grid"><section className="card detail-evidence"><div className="section-head"><div><div className="eyebrow">CRYPTOGRAPHIC EVIDENCE</div><h2>Fingerprint</h2></div><span className="verified-chip"><i/> REGISTERED</span></div><div className="fingerprint-box"><div><span>{a.algorithm||'SHA-256'}</span><b>FILE INTEGRITY</b></div><code>{a.fingerprint||'Fingerprint not provided'}</code></div><div className="detail-properties"><div><span>Registration date</span><b>{date(a.registeredAt)}</b></div><div><span>Registrant</span><b>{a.registrant||'Not provided'}</b></div><div><span>File size</span><b>{size(a.fileSize)}</b></div><div><span>Metadata URI</span><b>{a.metadataUri||'Not provided'}</b></div></div></section><section className="card detail-blockchain"><div className="eyebrow">BLOCKCHAIN EVIDENCE</div><h2>Network record</h2><div className="detail-properties"><div><span>Network</span><b>{a.network||a.chainId||'Not provided'}</b></div><div><span>Contract address</span><b className="mono-value">{a.contractAddress||'Not provided'}</b></div><div><span>Transaction hash</span><b className="mono-value">{a.transactionHash||'Not provided'}</b></div></div><p className="chain-note">Blockchain fields are shown only when returned by the API.</p></section></div><section className="card detail-lineage"><div className="section-head"><div><div className="eyebrow">TRACEABLE LINEAGE</div><h2>Provenance</h2></div><Link className="text-link" to={`/app/provenance?artifactId=${encodeURIComponent(a.artifactId)}`}>Open lineage explorer ↗</Link></div><Graph data={graph}/></section><section className="detail-analysis-link"><div><span className="analysis-preview-icon">◇</span><span><b>AI Integrity Analysis</b><small>Analysis results are not currently returned by the API.</small></span></div><Link to="/app/analysis" className="inline-link">Open analysis workspace <span>→</span></Link></section></div>
+function AnalysisPage() {
+  const [search, setSearch] = useSearchParams();
+  const [id, setId] = useState(search.get("artifactId") || "");
+  const [provenance, setProvenance] = useState<Provenance>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function load(value = id.trim()) {
+    if (!value) return;
+    setBusy(true);
+    setError("");
+    setProvenance(undefined);
+    setSearch({ artifactId: value });
+    try {
+      setProvenance(await getProvenance(value));
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Analysis evidence could not be loaded."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    const initial = search.get("artifactId");
+    if (initial) {
+      setId(initial);
+      void load(initial);
+    }
+  }, []);
+  const analysis = provenance?.analysis;
+  return (
+    <div className="app-page analysis-workspace">
+      <div className="page-title">
+        <div>
+          <div className="eyebrow">INTEGRITY SIGNALS</div>
+          <h1>AI Analysis</h1>
+          <p>
+            Understand the provenance signals reported for a registered
+            artifact.
+          </p>
+        </div>
+      </div>
+      <form
+        className="provenance-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void load();
+        }}
+      >
+        <label htmlFor="analysis-artifact-id">ARTIFACT ID</label>
+        <input
+          id="analysis-artifact-id"
+          value={id}
+          onChange={(event) => setId(event.target.value)}
+          placeholder="Enter a registered artifact ID"
+          required
+        />
+        <button className="button primary" disabled={busy}>
+          {busy ? "Loading analysis…" : "Load analysis"} <span>→</span>
+        </button>
+      </form>
+      {error && (
+        <div className="provenance-error" role="alert">
+          <span>!</span>
+          <p>{error}</p>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => void load()}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {busy && (
+        <div className="lineage-loading">
+          <span className="spinner" /> Retrieving analysis evidence…
+        </div>
+      )}
+      {analysis ? (
+        <section className="analysis-state">
+          <div className="analysis-state-head">
+            <span className="analysis-state-icon">◇</span>
+            <div>
+              <span className="section-kicker">BACKEND ANALYSIS</span>
+              <h2>
+                {analysis.riskLevel} risk · {analysis.severity} severity
+              </h2>
+              <p>{analysis.explanation}</p>
+            </div>
+            <span className="preview-status">REPORTED</span>
+          </div>
+          <div className="analysis-honesty">
+            <b>Risk score: {analysis.riskScore}</b>
+            <p>
+              Reported by the provenance analysis service. This score does not
+              independently prove the supplied training history is factual.
+            </p>
+          </div>
+          <div className="analysis-signal-list">
+            {analysis.issues.length ? (
+              analysis.issues.map((issue, index) => (
+                <div
+                  key={`${issue.code}-${
+                    issue.affectedNodeId || "none"
+                  }-${index}`}
+                >
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <b>{issue.code.replace(/_/g, " ")}</b>
+                  <small>
+                    {issue.message}
+                    {issue.affectedField
+                      ? ` · Field: ${issue.affectedField}`
+                      : ""}
+                  </small>
+                  <i>
+                    {issue.severity}
+                    {issue.affectedNodeId
+                      ? ` · ${short(issue.affectedNodeId, 20)}`
+                      : ""}
+                  </i>
+                </div>
+              ))
+            ) : (
+              <div>
+                <span>✓</span>
+                <b>No configured consistency issues reported</b>
+                <small>
+                  The service returned no issue entries for this artifact.
+                </small>
+                <i>NONE</i>
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+        !busy &&
+        !error && (
+          <section className="analysis-state">
+            <div className="analysis-state-head">
+              <span className="analysis-state-icon">◇</span>
+              <div>
+                <span className="section-kicker">ANALYSIS SERVICE</span>
+                <h2>
+                  {provenance ? "Analysis unavailable" : "Select an artifact"}
+                </h2>
+                <p>
+                  {provenance
+                    ? "The provenance API returned graph data without an analysis payload. No findings or risk score are inferred."
+                    : "Enter an artifact ID to request its provenance analysis from the API."}
+                </p>
+              </div>
+              <span className="preview-status">
+                {provenance ? "NOT RETURNED" : "READY"}
+              </span>
+            </div>
+            <div className="analysis-honesty">
+              <b>Evidence before conclusions</b>
+              <p>
+                Risk level, score, and detected issues appear only when the
+                backend returns them.
+              </p>
+            </div>
+          </section>
+        )
+      )}
+      {provenance && (
+        <div className="analysis-footer">
+          <Link
+            to={`/app/provenance?artifactId=${encodeURIComponent(id)}`}
+            className="inline-link"
+          >
+            Explore provenance graph <span>→</span>
+          </Link>
+          <span>{provenance.nodes.length} GRAPH NODES</span>
+        </div>
+      )}
+    </div>
+  );
 }
-function App(){return <BrowserRouter><Routes>
-  <Route path="/" element={<Landing/>}/>
-  <Route path="/app" element={<Shell/>}>
-    <Route index element={<Overview/>}/>
-    <Route path="register" element={<Register/>}/>
-    <Route path="verify" element={<Verify/>}/>
-    <Route path="artifacts" element={<ArtifactsPage/>}/>
-    <Route path="artifacts/:id" element={<Details/>}/>
-    <Route path="provenance" element={<ProvenancePage/>}/>
-    <Route path="analysis" element={<AnalysisPage/>}/>
-  </Route>
-  <Route path="/register" element={<Navigate to="/app/register" replace/>}/>
-  <Route path="/verify" element={<Navigate to="/app/verify" replace/>}/>
-  <Route path="/artifacts/:id" element={<LegacyArtifactRedirect/>}/>
-  <Route path="*" element={<Navigate to="/" replace/>}/>
-</Routes></BrowserRouter>}
+function LegacyArtifactRedirect() {
+  const { id = "" } = useParams();
+  return <Navigate to={`/app/artifacts/${encodeURIComponent(id)}`} replace />;
+}
+function Graph({
+  data,
+  onSelect,
+  selectedId,
+  orientation = "vertical",
+}: {
+  data?: Provenance;
+  onSelect?: (id: string) => void;
+  selectedId?: string;
+  orientation?: "vertical" | "horizontal";
+}) {
+  const nodes = data?.nodes || [];
+  const relationships =
+    data?.relationships ||
+    data?.edges?.map((edge) => ({
+      from: edge.source,
+      to: edge.target,
+      relationship: edge.type,
+    })) ||
+    [];
+  return (
+    <div
+      className={`graph ${
+        orientation === "horizontal" ? "graph-horizontal" : ""
+      }`}
+    >
+      {nodes.length === 0 ? (
+        <div className="empty-graph">
+          No provenance nodes were returned for this artifact.
+        </div>
+      ) : (
+        nodes.map((node, index) => (
+          <div className="graph-row" key={node.id}>
+            <button
+              type="button"
+              aria-label={`Select ${
+                node.label || node.name || node.type || "provenance node"
+              }`}
+              aria-pressed={selectedId === node.id}
+              className={`graph-node ${index === 0 ? "origin" : ""} ${
+                selectedId === node.id ? "selected" : ""
+              }`}
+              onClick={() => onSelect?.(node.id)}
+            >
+              <span className="node-symbol">
+                {index === 0 ? "◉" : index === nodes.length - 1 ? "⬡" : "◇"}
+              </span>
+              <span className="node-main">
+                <small>{node.type || "PROVENANCE STEP"}</small>
+                <b>
+                  {node.label || node.name || node.type || "Provenance step"}{" "}
+                  {node.version && <em>{node.version}</em>}
+                </b>
+                <span>{date(node.timestamp)}</span>
+              </span>
+              <span className="node-status">
+                <i /> {node.status || "Status not provided"}
+              </span>
+            </button>
+            {index < nodes.length - 1 &&
+              relationships.some(
+                (edge) =>
+                  edge.from === node.id && edge.to === nodes[index + 1].id
+              ) && (
+                <div className="graph-link">
+                  <span />
+                </div>
+              )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+function Register() {
+  const [file, setFile] = useState<File>();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [type, setType] = useState("dataset");
+  const [version, setVersion] = useState("v1.0.0");
+  const [uri, setUri] = useState("");
+  const [provenanceText, setProvenanceText] = useState("");
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState<Artifact>();
+  function parsedProvenance(): ProvenanceInput | undefined {
+    return validateRegistrationProvenance(provenanceText, type, version, uri);
+  }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      setCreated(
+        await registerArtifact(file, {
+          artifactType: type,
+          version,
+          metadataUri: uri,
+          provenance: parsedProvenance(),
+        })
+      );
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Registration failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const pickFile = (next?: File) => {
+    if (next) {
+      const validationError = uploadSizeError(next);
+      if (validationError) {
+        setFile(undefined);
+        setError(validationError);
+        return;
+      }
+    }
+    setFile(next);
+    if (fileInput.current) fileInput.current.value = "";
+    setError("");
+  };
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    pickFile(event.dataTransfer.files[0]);
+  }
+  return (
+    <div className="app-page registration-workspace">
+      <div className="page-title">
+        <div>
+          <div className="eyebrow">ARTIFACT REGISTRATION</div>
+          <h1>Register Artifact</h1>
+          <p>Create a verifiable identity for an AI artifact.</p>
+        </div>
+      </div>
+      {created ? (
+        <>
+          <div className="registered-heading">
+            <span className="registered-check">✓</span>
+            <div>
+              <div className="eyebrow">REGISTRATION RESPONSE</div>
+              <h2>Artifact Registered</h2>
+              <p>
+                Values below are from the configured{" "}
+                {isDemoMode ? "demo service" : "API"} response.
+              </p>
+            </div>
+          </div>
+          <section className="registered-summary card">
+            <div className="registered-id">
+              <span>ARTIFACT ID</span>
+              <b>{created.artifactId}</b>
+            </div>
+            <div className="registered-fingerprint">
+              <span>SHA-256 FINGERPRINT</span>
+              <code>{created.fingerprint || "Not returned"}</code>
+            </div>
+            <dl className="registered-fields">
+              <div>
+                <dt>Version</dt>
+                <dd>{created.version || "Not returned"}</dd>
+              </div>
+              <div>
+                <dt>Type</dt>
+                <dd>{created.artifactType || "Not returned"}</dd>
+              </div>
+              <div>
+                <dt>Registration time</dt>
+                <dd>{date(created.registeredAt)}</dd>
+              </div>
+              <div>
+                <dt>Network</dt>
+                <dd>{created.network || created.chainId || "Not returned"}</dd>
+              </div>
+              <div>
+                <dt>Contract address</dt>
+                <dd className="mono-value">
+                  {created.contractAddress || "Not returned"}
+                </dd>
+              </div>
+              <div>
+                <dt>Blockchain status</dt>
+                <dd>
+                  {created.transactionHash
+                    ? "Transaction hash returned"
+                    : "Not returned"}
+                </dd>
+              </div>
+              <div>
+                <dt>Transaction hash</dt>
+                <dd className="mono-value">
+                  {created.transactionHash || "Not returned"}
+                </dd>
+              </div>
+            </dl>
+            <div className="registered-actions">
+              <Link
+                className="button primary"
+                to={`/app/artifacts/${encodeURIComponent(created.artifactId)}`}
+              >
+                View Artifact <span>↗</span>
+              </Link>
+              <Link
+                className="button secondary"
+                to={`/app/provenance?artifactId=${encodeURIComponent(
+                  created.artifactId
+                )}`}
+              >
+                View Provenance <span>→</span>
+              </Link>
+              <button
+                className="button quiet"
+                onClick={() => {
+                  setCreated(undefined);
+                  setFile(undefined);
+                  setStep(1);
+                }}
+              >
+                Register another
+              </button>
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <div
+            className="registration-steps"
+            aria-label="Registration progress"
+          >
+            {(["UPLOAD ARTIFACT", "ARTIFACT DETAILS", "REVIEW"] as const).map(
+              (label, index) => (
+                <button
+                  type="button"
+                  key={label}
+                  className={step === index + 1 ? "current" : ""}
+                  onClick={() => {
+                    if (index === 0 || (file && index === 1))
+                      setStep((index + 1) as 1 | 2 | 3);
+                  }}
+                >
+                  <span>0{index + 1}</span>
+                  {label}
+                </button>
+              )
+            )}
+          </div>
+          <form className="registration-card card" onSubmit={submit}>
+            {step === 1 && (
+              <section className="registration-stage">
+                <div className="stage-heading">
+                  <span>STEP 01</span>
+                  <h2>Upload artifact</h2>
+                  <p>
+                    Select the dataset, model, or file you want to register.
+                  </p>
+                </div>
+                <label
+                  className={`dropzone registration-drop ${
+                    file ? "has-file" : ""
+                  }`}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    onChange={(event) => pickFile(event.target.files?.[0])}
+                  />
+                  <span className="upload-icon">↑</span>
+                  {file ? (
+                    <>
+                      <b>{file.name}</b>
+                      <span>{size(file.size)} · Selected for registration</span>
+                      <small>
+                        Choose a different file to replace this selection.
+                      </small>
+                    </>
+                  ) : (
+                    <>
+                      <b>Drop your artifact here</b>
+                      <span>
+                        or <u>browse files</u> from your device
+                      </span>
+                      <small>Your artifact file remains off-chain.</small>
+                    </>
+                  )}
+                </label>
+                {file && (
+                  <div className="file-selection">
+                    <span className="file-icon">
+                      {type === "dataset" ? "▤" : "⬡"}
+                    </span>
+                    <span>
+                      <b>{file.name}</b>
+                      <small>
+                        {size(file.size)} · {type}
+                      </small>
+                    </span>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => pickFile(undefined)}
+                    >
+                      Remove file
+                    </button>
+                  </div>
+                )}
+                <div className="stage-actions">
+                  <span>Supported: dataset, model, or other artifact</span>
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={!file}
+                    onClick={() => setStep(2)}
+                  >
+                    Continue to details <span>→</span>
+                  </button>
+                </div>
+              </section>
+            )}
+            {step === 2 && (
+              <section className="registration-stage">
+                <div className="stage-heading">
+                  <span>STEP 02</span>
+                  <h2>Artifact details and lineage</h2>
+                  <p>
+                    Add standard metadata and optional provenance JSON. The
+                    generated artifact ID is supplied by the backend.
+                  </p>
+                </div>
+                <div className="details-fields">
+                  <label>
+                    <span className="field-label">ARTIFACT TYPE</span>
+                    <select
+                      value={type}
+                      onChange={(event) => setType(event.target.value)}
+                    >
+                      <option value="dataset">Dataset</option>
+                      <option value="model">Model</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="field-label">VERSION</span>
+                    <input
+                      value={version}
+                      onChange={(event) => setVersion(event.target.value)}
+                      placeholder="e.g. v1"
+                      required
+                    />
+                  </label>
+                  <label className="metadata-field">
+                    <span className="field-label">
+                      METADATA URI <span>Optional</span>
+                    </span>
+                    <input
+                      value={uri}
+                      onChange={(event) => setUri(event.target.value)}
+                      placeholder="https:// or ipfs:// reference"
+                    />
+                    <small>
+                      Reference metadata associated with this artifact.
+                    </small>
+                  </label>
+                  <label className="metadata-field">
+                    <span className="field-label">
+                      PROVENANCE JSON <span>Optional</span>
+                    </span>
+                    <textarea
+                      value={provenanceText}
+                      onChange={(event) =>
+                        setProvenanceText(event.target.value)
+                      }
+                      placeholder={
+                        '{"dataset":"dataset-id","preprocessing":"prep-id","trainingRun":"training-id","metadata":{"name":"Model name"}}'
+                      }
+                    />
+                    <small>
+                      Supports dataset(s), preprocessing, trainingRun, parent,
+                      metadata, timestamp, and validated relationships.
+                    </small>
+                  </label>
+                </div>
+                <div className="stage-actions">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => setStep(1)}
+                  >
+                    ← Back to upload
+                  </button>
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={!version.trim()}
+                    onClick={() => {
+                      try {
+                        parsedProvenance();
+                        setError("");
+                        setStep(3);
+                      } catch (error) {
+                        setError(
+                          error instanceof Error
+                            ? error.message
+                            : "Invalid provenance."
+                        );
+                      }
+                    }}
+                  >
+                    Review registration <span>→</span>
+                  </button>
+                </div>
+                {error && <div className="form-error">⚠ {error}</div>}
+              </section>
+            )}
+            {step === 3 && (
+              <section className="registration-stage">
+                <div className="stage-heading">
+                  <span>STEP 03</span>
+                  <h2>Review registration</h2>
+                  <p>
+                    Confirm the file and metadata before sending them to the
+                    registration API.
+                  </p>
+                </div>
+                <dl className="review-list">
+                  <div>
+                    <dt>Artifact file</dt>
+                    <dd>
+                      {file?.name || "No file selected"}{" "}
+                      <small>{file ? size(file.size) : ""}</small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Artifact type</dt>
+                    <dd>{type}</dd>
+                  </div>
+                  <div>
+                    <dt>Version</dt>
+                    <dd>{version || "Not provided"}</dd>
+                  </div>
+                  <div>
+                    <dt>Metadata URI</dt>
+                    <dd>{uri || "Not provided"}</dd>
+                  </div>
+                  <div>
+                    <dt>Provenance</dt>
+                    <dd>
+                      {provenanceText.trim()
+                        ? "Provided and validated"
+                        : "Not provided"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Evidence handling</dt>
+                    <dd>Fingerprint and metadata submitted to backend</dd>
+                  </div>
+                </dl>
+                {error && <div className="form-error">⚠ {error}</div>}
+                <div className="stage-actions">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => setStep(2)}
+                  >
+                    ← Edit details
+                  </button>
+                  <button
+                    type="submit"
+                    className="button primary"
+                    disabled={!file || busy}
+                  >
+                    {busy ? (
+                      <>
+                        <span className="spinner" />
+                        Registering artifact…
+                      </>
+                    ) : (
+                      <>
+                        Register Artifact <span>↗</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="privacy">
+                  <span>◇</span> Your artifact file stays off-chain.
+                  Registration values are returned by the backend.
+                </p>
+              </section>
+            )}
+          </form>
+          <aside className="registration-aside">
+            <div className="section-kicker">EVIDENCE MODEL</div>
+            <h3>
+              Artifact files
+              <br />
+              stay off-chain.
+            </h3>
+            <p>
+              The backend handles fingerprinting and submits the registration
+              request. This page does not calculate blockchain data.
+            </p>
+            <div className="registration-aside-flow">
+              <span>FILE</span>
+              <i>→</i>
+              <span>FINGERPRINT</span>
+              <i>→</i>
+              <span>RECORD</span>
+            </div>
+            <small>Never enter wallet keys or secrets here.</small>
+          </aside>
+        </>
+      )}
+    </div>
+  );
+}
+function Verify() {
+  const [search] = useSearchParams();
+  const [id, setId] = useState(search.get("artifactId") || "");
+  const [file, setFile] = useState<File>();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Verification>();
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!file || !id.trim()) return;
+    setBusy(true);
+    setError("");
+    setResult(undefined);
+    try {
+      setResult(await verifyArtifact(file, id.trim()));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Verification failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function pickFile(next?: File) {
+    if (!next) {
+      setFile(undefined);
+      return;
+    }
+    const validationError = uploadSizeError(next);
+    if (validationError) {
+      setFile(undefined);
+      setError(validationError);
+      return;
+    }
+    setError("");
+    setFile(next);
+  }
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    pickFile(event.dataTransfer.files[0]);
+  }
+  return (
+    <div className="app-page verification-workspace">
+      <div className="page-title">
+        <div>
+          <div className="eyebrow">INDEPENDENT VERIFICATION</div>
+          <h1>Verify Artifact</h1>
+          <p>Confirm that an artifact matches its registered fingerprint.</p>
+        </div>
+      </div>
+      <div className="verify-layout">
+        <form className="card verify-form" onSubmit={submit}>
+          <div className="verify-lock">⌕</div>
+          <h2>Verify artifact integrity</h2>
+          <p>
+            Upload the original artifact and provide its registered ID. The
+            backend recalculates and compares its fingerprint.
+          </p>
+          <label>
+            <span className="field-label">
+              ARTIFACT ID <span>Required</span>
+            </span>
+            <input
+              value={id}
+              onChange={(event) => setId(event.target.value)}
+              placeholder="Paste the registered artifact ID"
+              required
+            />
+          </label>
+          <label
+            className={`dropzone verify-drop ${file ? "has-file" : ""}`}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <input
+              type="file"
+              onChange={(event) => pickFile(event.target.files?.[0])}
+            />
+            <span className="upload-icon">↑</span>
+            {file ? (
+              <>
+                <b>{file.name}</b>
+                <span>{size(file.size)} · Ready for verification</span>
+              </>
+            ) : (
+              <>
+                <b>Choose the artifact to verify</b>
+                <span>
+                  or <u>browse files</u>
+                </span>
+              </>
+            )}
+          </label>
+          {file && (
+            <button
+              type="button"
+              className="text-button file-remove"
+              onClick={() => pickFile(undefined)}
+            >
+              Remove selected file
+            </button>
+          )}
+          {error && <div className="form-error">⚠ {error}</div>}
+          <button
+            className="button primary submit"
+            disabled={!file || !id.trim() || busy}
+          >
+            {busy ? (
+              <>
+                <span className="spinner" />
+                Verifying artifact…
+              </>
+            ) : (
+              <>
+                Verify Integrity <span>⌕</span>
+              </>
+            )}
+          </button>
+          <div className="privacy">
+            <span>◇</span> Verification uses the configured backend service.
+          </div>
+        </form>
+        <div className="verify-side">
+          {busy ? (
+            <div className="verify-progress card">
+              <span className="spinner" />
+              <h2>Verifying artifact…</h2>
+              <p>Calculating fingerprint and comparing registered evidence.</p>
+            </div>
+          ) : result ? (
+            <div
+              className={`verification-result ${
+                result.verified ? "pass" : "fail"
+              }`}
+            >
+              <div className="result-symbol">{result.verified ? "✓" : "×"}</div>
+              <div className="eyebrow">
+                {result.verified ? "INTEGRITY CONFIRMED" : "MISMATCH DETECTED"}
+              </div>
+              <h2>{result.verified ? "VERIFIED" : "VERIFICATION FAILED"}</h2>
+              <p>
+                {result.message ||
+                  (result.verified
+                    ? "The uploaded artifact matches the registered fingerprint."
+                    : "The uploaded artifact does not match the registered fingerprint.")}
+              </p>
+              <div className="result-lines">
+                <span>
+                  ARTIFACT ID<b>{result.artifactId || "Not returned"}</b>
+                </span>
+                <span>
+                  CALCULATED FINGERPRINT
+                  <code>
+                    {result.uploadedHash ||
+                      result.calculatedHash ||
+                      "Not returned"}
+                  </code>
+                </span>
+                <span>
+                  EXPECTED FINGERPRINT
+                  <code>
+                    {result.registeredHash ||
+                      result.expectedHash ||
+                      "Not returned"}
+                  </code>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="verify-explainer">
+              <div className="eyebrow">INDEPENDENT INTEGRITY CHECK</div>
+              <h2>
+                Compare the file
+                <br />
+                with its evidence.
+              </h2>
+              <p>
+                The backend evaluates the uploaded artifact against its
+                registered fingerprint and returns the verification result.
+              </p>
+              <div className="explainer-note">
+                <span>i</span> A change to the file contents should produce a
+                different fingerprint.
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+function Details() {
+  const { id = "" } = useParams();
+  const [a, setA] = useState<Artifact>();
+  const [graph, setGraph] = useState<Provenance>();
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setA(undefined);
+    setGraph(undefined);
+    setError("");
+    getArtifact(id)
+      .then((artifact) => {
+        if (active) setA(artifact);
+      })
+      .catch((error) => {
+        if (active)
+          setError(
+            error instanceof Error ? error.message : "Unable to load artifact."
+          );
+      });
+    getProvenance(id)
+      .then((lineage) => {
+        if (active) setGraph(lineage);
+      })
+      .catch(() => {
+        if (active) setGraph(undefined);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, attempt]);
+  if (error)
+    return (
+      <div className="card not-found">
+        <div className="eyebrow">ARTIFACT UNAVAILABLE</div>
+        <h2>We couldn’t load this artifact.</h2>
+        <p>{error}</p>
+        <div className="hero-actions">
+          <button
+            className="button primary"
+            onClick={() => setAttempt((value) => value + 1)}
+          >
+            Retry <span>↻</span>
+          </button>
+          <Link to="/app/artifacts" className="button secondary">
+            Back to artifacts
+          </Link>
+        </div>
+      </div>
+    );
+  if (!a)
+    return (
+      <div className="loading-page">
+        <span className="spinner" /> Loading artifact evidence…
+      </div>
+    );
+  return (
+    <div className="app-page detail-workspace">
+      <div className="detail-back">
+        <Link to="/app/artifacts">← Artifacts</Link>
+        <span> / </span>
+        {a.artifactId}
+      </div>
+      <div className="page-title detail-title">
+        <div>
+          <div className="eyebrow">ARTIFACT RECORD</div>
+          <h1>{a.originalFilename || a.artifactType || "AI artifact"}</h1>
+          <p>
+            {a.artifactType || "Type not provided"} <span>·</span> Version{" "}
+            {a.version || "Not provided"} <span>·</span> Registered{" "}
+            {date(a.registeredAt)}
+          </p>
+        </div>
+        <Link
+          className="button primary"
+          to={`/app/verify?artifactId=${encodeURIComponent(a.artifactId)}`}
+        >
+          Verify Artifact <span>→</span>
+        </Link>
+      </div>
+      <section className="detail-overview">
+        <div>
+          <span>ARTIFACT ID</span>
+          <b>{a.artifactId}</b>
+        </div>
+        <div>
+          <span>TYPE</span>
+          <b>{a.artifactType || "Not provided"}</b>
+        </div>
+        <div>
+          <span>VERSION</span>
+          <b>{a.version || "Not provided"}</b>
+        </div>
+        <div>
+          <span>REGISTRATION</span>
+          <b>
+            <i className="registered-indicator" /> Registered
+          </b>
+        </div>
+      </section>
+      <div className="detail-content-grid">
+        <section className="card detail-evidence">
+          <div className="section-head">
+            <div>
+              <div className="eyebrow">CRYPTOGRAPHIC EVIDENCE</div>
+              <h2>Fingerprint</h2>
+            </div>
+            <span className="verified-chip">
+              <i /> REGISTERED
+            </span>
+          </div>
+          <div className="fingerprint-box">
+            <div>
+              <span>{a.algorithm || "SHA-256"}</span>
+              <b>FILE INTEGRITY</b>
+            </div>
+            <code>{a.fingerprint || "Fingerprint not provided"}</code>
+          </div>
+          <div className="detail-properties">
+            <div>
+              <span>Registration date</span>
+              <b>{date(a.registeredAt)}</b>
+            </div>
+            <div>
+              <span>Registrant</span>
+              <b>{a.registrant || "Not provided"}</b>
+            </div>
+            <div>
+              <span>File size</span>
+              <b>{size(a.fileSize)}</b>
+            </div>
+            <div>
+              <span>Metadata URI</span>
+              <b>{a.metadataUri || "Not provided"}</b>
+            </div>
+          </div>
+        </section>
+        <section className="card detail-blockchain">
+          <div className="eyebrow">BLOCKCHAIN EVIDENCE</div>
+          <h2>Network record</h2>
+          <div className="detail-properties">
+            <div>
+              <span>Network</span>
+              <b>{a.network || a.chainId || "Not provided"}</b>
+            </div>
+            <div>
+              <span>Contract address</span>
+              <b className="mono-value">
+                {a.contractAddress || "Not provided"}
+              </b>
+            </div>
+            <div>
+              <span>Transaction hash</span>
+              <b className="mono-value">
+                {a.transactionHash || "Not provided"}
+              </b>
+            </div>
+          </div>
+          <p className="chain-note">
+            Blockchain fields are shown only when returned by the API.
+          </p>
+        </section>
+      </div>
+      <section className="card detail-lineage">
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">TRACEABLE LINEAGE</div>
+            <h2>Provenance</h2>
+          </div>
+          <Link
+            className="text-link"
+            to={`/app/provenance?artifactId=${encodeURIComponent(
+              a.artifactId
+            )}`}
+          >
+            Open lineage explorer ↗
+          </Link>
+        </div>
+        <Graph data={graph} />
+      </section>
+      <section className="detail-analysis-link">
+        <div>
+          <span className="analysis-preview-icon">◇</span>
+          <span>
+            <b>AI Integrity Analysis</b>
+            <small>
+              Deterministic backend analysis is available through the provenance
+              API.
+            </small>
+          </span>
+        </div>
+        <Link
+          to={`/app/analysis?artifactId=${encodeURIComponent(a.artifactId)}`}
+          className="inline-link"
+        >
+          Open analysis workspace <span>→</span>
+        </Link>
+      </section>
+    </div>
+  );
+}
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/app" element={<Shell />}>
+          <Route index element={<Overview />} />
+          <Route path="register" element={<Register />} />
+          <Route path="verify" element={<Verify />} />
+          <Route path="artifacts" element={<ArtifactsPage />} />
+          <Route path="artifacts/:id" element={<Details />} />
+          <Route path="provenance" element={<ProvenancePage />} />
+          <Route path="analysis" element={<AnalysisPage />} />
+        </Route>
+        <Route
+          path="/register"
+          element={<Navigate to="/app/register" replace />}
+        />
+        <Route path="/verify" element={<Navigate to="/app/verify" replace />} />
+        <Route path="/artifacts/:id" element={<LegacyArtifactRedirect />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
 export default App;

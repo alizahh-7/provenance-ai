@@ -1,10 +1,118 @@
-import type { Artifact, Verification, Provenance } from '../types/artifact';
-const read = ():Artifact[] => { try { return JSON.parse(localStorage.getItem('provenance-demo-artifacts') || '[]'); } catch { return []; } };
-const write=(items:Artifact[])=>localStorage.setItem('provenance-demo-artifacts',JSON.stringify(items));
-const hash=(seed:string)=>Array.from({length:64},(_,i)=>'0123456789abcdef'[(seed.charCodeAt(i%seed.length)+i*7)%16]).join('');
+import type {
+  Artifact,
+  Verification,
+  Provenance,
+  ProvenanceInput,
+} from "../types/artifact";
+const read = (): Artifact[] => {
+  try {
+    return JSON.parse(
+      localStorage.getItem("provenance-demo-artifacts") || "[]"
+    );
+  } catch {
+    return [];
+  }
+};
+const write = (items: Artifact[]) =>
+  localStorage.setItem("provenance-demo-artifacts", JSON.stringify(items));
+const hash = (seed: string) =>
+  Array.from(
+    { length: 64 },
+    (_, i) =>
+      "0123456789abcdef"[(seed.charCodeAt(i % seed.length) + i * 7) % 16]
+  ).join("");
 export const mockApi = {
- async registerArtifact(file:File,data:{artifactType:string;version:string;metadataUri:string}):Promise<Artifact>{await new Promise(r=>setTimeout(r,850));const artifact:Artifact={artifactId:`demo_${Date.now().toString(36)}`,fingerprint:hash(`${file.name}${file.size}${file.lastModified}`),...data,originalFilename:file.name,fileSize:file.size,algorithm:'SHA-256',registeredAt:new Date().toISOString(),network:'Demo mode',transactionHash:undefined};write([artifact,...read()]);return artifact;},
- async verifyArtifact(file:File,id:string):Promise<Verification>{await new Promise(r=>setTimeout(r,650));const a=read().find(x=>x.artifactId===id);if(!a) throw new Error('Artifact ID was not found in demo records. Register an artifact first.'); const uploaded=hash(`${file.name}${file.size}${file.lastModified}`), verified=uploaded===a.fingerprint;return {verified,status:verified?'PASS':'FAIL',artifactId:id,uploadedHash:uploaded,registeredHash:a.fingerprint,message:verified?'Artifact fingerprint matches the demo record.':'Artifact fingerprint does not match the demo record.'};},
- async getArtifact(id:string){await new Promise(r=>setTimeout(r,180));const a=read().find(x=>x.artifactId===id);if(!a)throw new Error('Artifact not found in demo records.');return a;},
- async getProvenance(id:string):Promise<Provenance>{const a=await this.getArtifact(id);return {nodes:[{id:`${id}-source`,label:'Dataset',type:'ORIGIN',version:'v1',timestamp:typeof a.registeredAt==='number'?new Date(a.registeredAt*1000).toISOString():a.registeredAt,status:'Recorded'},{id:`${id}-prep`,label:'Preprocessing',type:'TRANSFORMATION',status:'Demo lineage'},{id:`${id}-training`,label:'Training Run #1',type:'TRAINING',status:'Demo lineage'},{id:`${id}-model`,label:a.artifactType==='model'?'Model':'Artifact',type:'MODEL',version:a.version,status:'Registered'}],relationships:[{from:`${id}-source`,to:`${id}-prep`},{from:`${id}-prep`,to:`${id}-training`},{from:`${id}-training`,to:`${id}-model`}]};}
+  async registerArtifact(
+    file: File,
+    data: {
+      artifactType: string;
+      version: string;
+      metadataUri: string;
+      provenance?: ProvenanceInput;
+    }
+  ): Promise<Artifact> {
+    await new Promise((r) => setTimeout(r, 850));
+    const { provenance: _provenance, ...artifactData } = data;
+    const artifact: Artifact = {
+      artifactId: `demo_${Date.now().toString(36)}`,
+      fingerprint: hash(`${file.name}${file.size}${file.lastModified}`),
+      ...artifactData,
+      originalFilename: file.name,
+      fileSize: file.size,
+      algorithm: "SHA-256",
+      registeredAt: new Date().toISOString(),
+      network: "Demo mode",
+      transactionHash: undefined,
+    };
+    write([artifact, ...read()]);
+    return artifact;
+  },
+  async verifyArtifact(file: File, id: string): Promise<Verification> {
+    await new Promise((r) => setTimeout(r, 650));
+    const a = read().find((x) => x.artifactId === id);
+    if (!a)
+      throw new Error(
+        "Artifact ID was not found in demo records. Register an artifact first."
+      );
+    const uploaded = hash(`${file.name}${file.size}${file.lastModified}`),
+      verified = uploaded === a.fingerprint;
+    return {
+      verified,
+      status: verified ? "PASS" : "FAIL",
+      artifactId: id,
+      uploadedHash: uploaded,
+      registeredHash: a.fingerprint,
+      message: verified
+        ? "Artifact fingerprint matches the demo record."
+        : "Artifact fingerprint does not match the demo record.",
+    };
+  },
+  async getArtifact(id: string) {
+    await new Promise((r) => setTimeout(r, 180));
+    const a = read().find((x) => x.artifactId === id);
+    if (!a) throw new Error("Artifact not found in demo records.");
+    return a;
+  },
+  async getProvenance(id: string): Promise<Provenance> {
+    const a = await this.getArtifact(id);
+    return {
+      nodes: [
+        {
+          id: `${id}-source`,
+          label: "Dataset",
+          type: "ORIGIN",
+          version: "v1",
+          timestamp:
+            typeof a.registeredAt === "number"
+              ? new Date(a.registeredAt * 1000).toISOString()
+              : a.registeredAt,
+          status: "Recorded",
+        },
+        {
+          id: `${id}-prep`,
+          label: "Preprocessing",
+          type: "TRANSFORMATION",
+          status: "Demo lineage",
+        },
+        {
+          id: `${id}-training`,
+          label: "Training Run #1",
+          type: "TRAINING",
+          status: "Demo lineage",
+        },
+        {
+          id: `${id}-model`,
+          label: a.artifactType === "model" ? "Model" : "Artifact",
+          type: "MODEL",
+          version: a.version,
+          status: "Registered",
+        },
+      ],
+      relationships: [
+        { from: `${id}-source`, to: `${id}-prep` },
+        { from: `${id}-prep`, to: `${id}-training` },
+        { from: `${id}-training`, to: `${id}-model` },
+      ],
+    };
+  },
 };
