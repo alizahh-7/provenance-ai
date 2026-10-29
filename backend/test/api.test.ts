@@ -67,6 +67,28 @@ describe("artifact API", () => {
     expect(graph.status).toBe(200);
     expect(graph.body.analysis.issues.some((issue: { code: string }) => issue.code === "MISSING_DATASET")).toBe(true);
   });
+  it("returns each artifact's submitted dataset and reports missing provenance without inventing lineage", async () => {
+    const register = (dataset: string) => request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v1").field("provenance", JSON.stringify({ artifactType: "model", version: "v1", dataset, preprocessing: `prep-${dataset}`, trainingRun: `train-${dataset}` })).attach("artifact", Buffer.from(`artifact ${dataset}`), "model.bin");
+    const [a, b] = await Promise.all([register("actual-dataset-a"), register("actual-dataset-b")]);
+    const [graphA, graphB] = await Promise.all([request(app).get(`/api/provenance/${a.body.artifact.artifactId}`), request(app).get(`/api/provenance/${b.body.artifact.artifactId}`)]);
+    expect(graphA.body.nodes.some((node: { id: string }) => node.id === "actual-dataset-a")).toBe(true);
+    expect(graphA.body.nodes.some((node: { id: string }) => node.id === "actual-dataset-b")).toBe(false);
+    expect(graphB.body.nodes.some((node: { id: string }) => node.id === "actual-dataset-b")).toBe(true);
+    const noProvenance = await request(app).post("/api/artifacts/register").field("artifactType", "model").field("version", "v1").attach("artifact", Buffer.from("no provenance"), "model.bin");
+    const missingGraph = await request(app).get(`/api/provenance/${noProvenance.body.artifact.artifactId}`);
+    expect(missingGraph.body.analysis.issues[0].code).toBe("MISSING_PROVENANCE");
+    expect(missingGraph.body.nodes).toHaveLength(1);
+  });
+  it("returns not found for an unknown artifact provenance request", async () => {
+    const response = await request(app).get("/api/provenance/art_unknown");
+    expect(response.status).toBe(404);
+    expect(response.body.code).toBe("ARTIFACT_NOT_FOUND");
+  });
+  it("rejects malformed artifact identifiers on the provenance endpoint", async () => {
+    const response = await request(app).get("/api/provenance/bad%20id");
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe("INVALID_ARTIFACT_ID");
+  });
 });
 
 describe("blockchain failure handling", () => {

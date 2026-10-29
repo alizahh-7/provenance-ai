@@ -1,10 +1,9 @@
-import type { OnChainArtifact, ProvenanceRecord, ProvenanceRelation } from "../models/artifact.js";
+import type { OnChainArtifact, ProvenanceRecord } from "../models/artifact.js";
 import { createGraphFromRecord } from "./provenanceAnalyzer.js";
 
 export class MetadataRepository {
   private artifacts = new Map<string, OnChainArtifact>();
   private provenance = new Map<string, ProvenanceRecord>();
-  private relations: ProvenanceRelation[] = [];
 
   async save(artifact: OnChainArtifact) {
     this.artifacts.set(artifact.artifactId, artifact);
@@ -12,11 +11,6 @@ export class MetadataRepository {
 
   async saveProvenance(record: ProvenanceRecord) {
     this.provenance.set(record.artifact, record);
-    this.relations = [...this.relations.filter((relation) => !(relation.from === record.artifact || relation.to === record.artifact)), ...record.relationships.map((relationship) => ({
-      from: relationship.from,
-      to: relationship.to,
-      relationship: relationship.relationship
-    }))];
   }
 
   async artifactIds(): Promise<string[]> {
@@ -35,25 +29,19 @@ export class MetadataRepository {
     return this.provenance.get(id) ?? null;
   }
 
-  async graph(id: string) {
+  async graph(id: string, knownArtifact?: OnChainArtifact | null) {
     const artifact = await this.get(id);
     const record = await this.getProvenance(id);
 
     if (!artifact && !record) {
-      return { nodes: [], relationships: [] };
+      return { nodes: [], edges: [], relationships: [] };
     }
 
-    const graph = record ? createGraphFromRecord(record) : { nodes: [{ id, type: artifact?.artifactType ?? "artifact", label: artifact?.artifactType ?? id, version: artifact?.version }], relationships: [] };
-
-    const normalizedRelationships = graph.relationships.map((relationship) => ({
-      from: relationship.source,
-      to: relationship.target,
-      relationship: relationship.type as ProvenanceRelation["relationship"]
-    }));
+    const found = artifact ?? knownArtifact;
+    const graph = record ? createGraphFromRecord(record) : { nodes: [{ id, type: found?.artifactType?.toLowerCase().includes("model") ? "model" as const : "artifact" as const, label: found?.artifactType ?? id, metadata: {}, version: found?.version }], edges: [], relationships: [] };
 
     return {
-      nodes: graph.nodes,
-      relationships: normalizedRelationships
+      ...graph
     };
   }
 }
