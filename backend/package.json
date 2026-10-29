@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "config:check": "node ../scripts/config-check.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
