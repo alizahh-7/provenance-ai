@@ -34,6 +34,7 @@ import type {
   Verification,
 } from "./types/artifact";
 import { validateRegistrationProvenance } from "./lib/registration";
+import PremiumLanding from "./components/PremiumLanding";
 import "./styles.css";
 const date = (v?: string | number) =>
   v
@@ -220,6 +221,7 @@ function Reveal({
   );
 }
 function Landing() {
+  return <PremiumLanding />;
   return (
     <main className="site-landing">
       <header className="site-nav-wrap">
