@@ -28,6 +28,7 @@ export const mockApi = {
       artifactType: string;
       version: string;
       metadataUri: string;
+      description?: string;
       provenance?: ProvenanceInput;
     }
   ): Promise<Artifact> {

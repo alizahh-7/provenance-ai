@@ -48,6 +48,7 @@ export const realApi = {
       artifactType: string;
       version: string;
       metadataUri: string;
+      description?: string;
       provenance?: ProvenanceInput;
     }
   ) {
@@ -57,6 +58,7 @@ export const realApi = {
     form.append("version", data.version);
     if (data.metadataUri.trim())
       form.append("metadataUri", data.metadataUri.trim());
+    if (data.description?.trim()) form.append("description", data.description.trim());
     if (data.provenance)
       form.append("provenance", JSON.stringify(data.provenance));
     const result = await request<{

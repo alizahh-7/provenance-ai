@@ -6,7 +6,7 @@ export type ProvenanceIssueCode =
   | "BROKEN_TRAINING_DATASET_RELATIONSHIP" | "UNKNOWN_PARENT";
 export interface ProvenanceIssue { code: ProvenanceIssueCode; severity: ProvenanceSeverity; message: string; affectedNodeId: string | null; affectedField?: string; }
 export type ProvenanceRiskLevel = "NONE" | "LOW" | "MEDIUM" | "HIGH";
-export interface ProvenanceAnalysis { riskLevel: ProvenanceRiskLevel; riskScore: number; severity: ProvenanceSeverity; issues: ProvenanceIssue[]; explanation: string; }
+export interface ProvenanceAnalysis { analysisMode: "RULE_BASED"; riskLevel: ProvenanceRiskLevel; riskScore: number; severity: ProvenanceSeverity; issues: ProvenanceIssue[]; explanation: string; }
 export type ProvenanceNodeType = "dataset" | "preprocessing" | "training" | "model" | "artifact";
 export interface ProvenanceGraphNode { id: string; type: ProvenanceNodeType; label: string; metadata: Record<string, unknown>; version?: string; }
 export type ProvenanceGraphEdgeType = "processed_by" | "preprocessing_for" | "dataset_for_training" | "trained_to_create" | "derived_from";

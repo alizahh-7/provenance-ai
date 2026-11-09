@@ -121,7 +121,7 @@ function Shell() {
                 : "Connection checked on request"}
             </small>
           </div>
-          <Link className="shell-help" to="/#evidence">
+          <Link className="shell-help" to="/#how-it-works">
             How evidence works <i>↗</i>
           </Link>
         </div>
@@ -583,6 +583,18 @@ function Overview() {
         <span className="workspace-mode">
           {isDemoMode ? "DEMO MODE" : "LIVE API"}
         </span>
+      </section>
+      <section className="workspace-guide" aria-labelledby="guide-title">
+        <div>
+          <span className="section-kicker">NEW TO PROVENANCEAI?</span>
+          <h2 id="guide-title">Start with one simple integrity check.</h2>
+          <p>Use a small, non-sensitive dataset or model file. Register it once, then upload the same file again to see a PASS result.</p>
+        </div>
+        <ol>
+          <li><span>01</span><Link to="/app/register"><b>Register a file</b><small>Create its SHA-256 evidence record.</small></Link></li>
+          <li><span>02</span><Link to="/app/verify"><b>Verify the same file</b><small>Compare its new hash with the evidence.</small></Link></li>
+          <li><span>03</span><Link to="/app/provenance"><b>Explore its lineage</b><small>Inspect relationships and integrity signals.</small></Link></li>
+        </ol>
       </section>
       <section className="command-section">
         <div className="command-section-heading">

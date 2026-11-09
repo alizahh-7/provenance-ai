@@ -114,7 +114,7 @@ export async function analyzeProvenance(record: ProvenanceRecord | null | undefi
   const riskScore = Math.min(100, unique.reduce((sum, issue) => sum + ({ HIGH: 40, MEDIUM: 20, LOW: 5 }[issue.severity]), 0));
   const riskLevel: ProvenanceRiskLevel = riskScore >= 60 ? "HIGH" : riskScore >= 30 ? "MEDIUM" : riskScore > 0 ? "LOW" : "NONE";
   const severity: ProvenanceSeverity = riskScore >= 60 ? "HIGH" : riskScore >= 30 ? "MEDIUM" : "LOW";
-  return { riskLevel, riskScore, severity, issues: unique, explanation: unique.length ? `${unique.length} provenance issue(s) were detected by deterministic metadata rules; this is not a trained model or proof of factual history.` : "No configured provenance consistency issues were detected; this does not independently prove the supplied history is factual." };
+  return { analysisMode: "RULE_BASED", riskLevel, riskScore, severity, issues: unique, explanation: unique.length ? `${unique.length} provenance issue(s) were detected by deterministic metadata rules; this is not a trained model or proof of factual history.` : "No configured provenance consistency issues were detected; this does not independently prove the supplied history is factual." };
 }
 
 export function createGraphFromRecord(record: ProvenanceRecord): ProvenanceGraph {
