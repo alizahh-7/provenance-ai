@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Artifact,
   Verification,
   Provenance,
@@ -6,7 +6,7 @@ import type {
   ProvenanceInput,
 } from "../types/artifact";
 const base = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"
+  import.meta.env.VITE_API_BASE_URL || "/api"
 ).replace(/\/$/, "");
 const headers = { "Content-Type": "application/json" };
 type ApiErrorBody = { message?: unknown; error?: unknown; code?: unknown };
@@ -145,3 +145,4 @@ export const realApi = {
     return Array.isArray(r.artifacts) ? r.artifacts : [];
   },
 };
+
