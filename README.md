@@ -2,152 +2,72 @@
 
 ### Proof Beyond Trust. A Verifiable Chain of Trust for AI.
 
-**TechnoDivas | HACKSPHERE 2026 — COMPSPHERE 12**
+**TechnoDivas · HACKSPHERE 2026 — COMPSPHERE 12 · International Team Category**
 
-ProvenanceAI is a Web3-powered AI provenance and integrity verification platform that enables independent verification of AI artifacts through cryptographic fingerprints, blockchain-backed registration, traceable lineage, and deterministic risk analysis.
-
-Instead of asking users to trust an AI developer's internal records, ProvenanceAI provides independently checkable evidence that a submitted artifact matches its registered version.
+ProvenanceAI is a Web3-powered AI artifact provenance and integrity verification platform. It combines SHA-256 fingerprints, blockchain-backed registration, structured artifact lineage, and deterministic consistency analysis to make registered AI artifacts independently checkable.
 
 **Register. Trace. Verify. Analyze.**
 
----
-
-## The Problem
-
-AI systems are increasingly built on complex pipelines involving datasets, preprocessing, training runs, and multiple model versions.
-
-But when an organization claims:
-
-- “This model was trained using a particular dataset.”
-- “This dataset has not changed since registration.”
-- “This is the same model version that was previously audited.”
-
-How can an independent party verify those claims?
-
-Traditional lineage and experiment-tracking tools are useful for internal recordkeeping, but their records generally remain within the organization's own infrastructure.
-
-This creates a trust asymmetry: the party making the claim also controls the supporting records.
-
-ProvenanceAI addresses this by anchoring artifact fingerprints to a public blockchain, allowing third parties to verify file integrity independently.
-
-## Our Solution
-
-ProvenanceAI introduces a verifiable trust layer for AI development.
-
-When a dataset or model is registered, the backend calculates its SHA-256 fingerprint and submits registration evidence to a Solidity smart contract deployed on Ethereum Sepolia.
-
-Users can subsequently upload a file and verify whether its calculated fingerprint matches the registered blockchain record.
-
-Alongside cryptographic verification, ProvenanceAI supports structured provenance metadata and a deterministic analysis engine that identifies configured lineage inconsistencies.
-
-The result is a platform connecting artifact integrity, traceability, and explainable risk signals in one workflow.
-
-### What makes ProvenanceAI different?
-
-**Internal tracking tells you what happened. ProvenanceAI provides independently checkable evidence of what was registered.**
-
-The platform does not require a verifier to blindly accept an organization's internal logs.
-
-It also makes an important distinction: a matching cryptographic fingerprint proves that a file matches its registered fingerprint. It does not, by itself, prove that every statement in the supplied provenance metadata is factually true.
+> A fingerprint match proves that a submitted file matches the fingerprint registered for it. It does not, by itself, prove that every descriptive claim in the associated provenance metadata is factually true.
 
 ---
 
-## Key Features
+## The problem
+
+AI development involves datasets, preprocessing steps, training runs, and multiple model versions. When a team claims that a model came from a particular dataset or that a file has not changed, an independent reviewer needs evidence that does not rely only on the team's private records.
+
+Traditional experiment tracking is valuable, but its records are often controlled by the same organization making the claim. ProvenanceAI adds a public, independently inspectable integrity anchor: a cryptographic fingerprint registered through a smart contract.
+
+## The solution
+
+A user registers a dataset, model, or other supported artifact. The backend calculates its SHA-256 fingerprint and submits registration evidence to a Solidity smart contract deployed on Ethereum Sepolia. Later, a verifier can upload a file and compare its newly calculated fingerprint with the registered evidence.
+
+The platform also stores structured provenance metadata off-chain, visualizes lineage, and evaluates configured consistency rules to surface explainable risk signals.
+
+## Core capabilities
 
 ### 1. Blockchain-backed artifact registration
+- Upload a supported artifact and select its type and version.
+- Calculate a SHA-256 fingerprint on the backend.
+- Associate optional metadata and structured provenance.
+- Submit registration evidence to the deployed smart contract.
+- Return an artifact ID and transaction details.
 
-Register a dataset, model, or other supported digital artifact.
+Original artifact files are not stored on-chain.
 
-The system:
+### 2. Independent file integrity verification
+- Supply an artifact ID and a file to verify.
+- Recalculate the file's SHA-256 fingerprint.
+- Compare it with the registered fingerprint.
+- Return a clear **VERIFIED** or **NOT VERIFIED** outcome.
 
-- Accepts the selected artifact.
-- Calculates its SHA-256 fingerprint.
-- Associates it with an artifact type and version.
-- Accepts optional metadata and structured provenance information.
-- Submits registration evidence through the backend to the deployed smart contract.
-- Returns the generated artifact ID and blockchain transaction details.
-
-Raw artifact files remain off-chain.
-
-### 2. Independent integrity verification
-
-Verify whether a file matches an existing registration.
-
-Upload the artifact and provide its registered artifact ID. The backend recalculates its fingerprint and compares it with the registered evidence.
-
-Possible outcomes include:
-
-**VERIFIED:** The submitted file matches the registered fingerprint.
-
-**NOT VERIFIED:** The submitted file differs from the registered artifact.
-
-Even a small modification changes the file's cryptographic fingerprint.
+Even a small file modification changes its cryptographic fingerprint.
 
 ### 3. Visual provenance explorer
-
-Explore the history associated with an artifact through an interactive lineage graph.
-
-The complete demo fixture represents:
+Explore the submitted development lineage as a graph:
 
 ```text
-Dataset
-   |
-   v
-Preprocessing
-   |
-   v
-Training
-   |
-   v
-Model
+Dataset → Preprocessing → Training → Model
 ```
 
-Users can inspect individual nodes and view the metadata returned by the provenance API.
-
-The graph represents submitted provenance records; missing details are not fabricated.
+The demo fixture contains four nodes and three connections. Users can inspect the graph and the metadata returned by the provenance API. The graph reflects submitted records; it does not invent missing lineage details.
 
 ### 4. Deterministic integrity analysis
+The current MVP evaluates structured provenance metadata using backend consistency rules. It can report configured inconsistencies, missing-lineage indicators, risk levels, numerical scores, and plain-language findings.
 
-ProvenanceAI analyzes structured lineage metadata using backend consistency rules.
+For the complete, internally consistent demo fixture, the expected result is:
+- Risk level: `NONE`
+- Risk score: `0`
+- Recorded nodes: `4`
+- Recorded connections: `3`
 
-The current implementation provides:
-
-- Risk levels and numerical scores.
-- Detection of configured provenance inconsistencies.
-- Missing-lineage indicators.
-- Plain-language explanations.
-- Results connected to the selected artifact.
-
-For a complete, internally consistent demo lineage, the expected result is:
-
-```text
-Risk level: NONE
-Risk score: 0
-Recorded nodes: 4
-Recorded connections: 3
-```
-
-The analysis is deterministic in the current MVP. LLM-assisted interpretation is a potential future extension, not a dependency of the existing verification workflow.
+**Important:** this is deterministic, rule-based analysis—not an LLM-based assessment. A score of zero means that no configured consistency rule was violated; it is not a guarantee that every provenance claim is true.
 
 ### 5. Artifact registry and evidence viewer
+Look up an artifact by its unique ID and inspect available details, including artifact type, version, SHA-256 fingerprint, registration time, registrant address, metadata URI, network/contract information, and associated provenance records.
 
-Retrieve a registered artifact using its unique artifact ID.
-
-The artifact detail page displays available information, including:
-
-- Artifact type and version.
-- SHA-256 fingerprint.
-- Registration timestamp.
-- Registrant address.
-- Metadata URI.
-- Blockchain network and contract information.
-- Associated provenance records.
-- Navigation to verification and analysis.
-
-### 6. User-facing verification workflow
-
-The application provides dedicated interfaces for:
-
+### 6. Application workflows
+The frontend includes:
 - Overview
 - Register
 - Verify
@@ -155,244 +75,174 @@ The application provides dedicated interfaces for:
 - Provenance
 - AI Analysis
 
-Users interact with these workflows without needing to manually calculate hashes or execute smart contract functions.
-
 ---
 
-## How ProvenanceAI Works
+## How it works
 
 ### Registration
 
 ```text
-User uploads an artifact
-          |
-          v
-Backend receives the file
-          |
-          v
-SHA-256 fingerprint generated
-          |
-          v
-Artifact metadata validated
-          |
-          v
-Registration submitted to smart contract
-          |
-          v
-Blockchain evidence returned
-          |
-          v
-Artifact ID generated
-          |
-          v
-Artifact available for future verification
+User uploads artifact
+        ↓
+Backend validates input and calculates SHA-256
+        ↓
+Registration evidence submitted to Sepolia smart contract
+        ↓
+Transaction details and artifact ID returned
+        ↓
+Off-chain metadata and provenance made available to the app
 ```
 
 ### Verification
 
 ```text
 User supplies artifact ID + file
-                |
-                v
-       File fingerprint calculated
-                |
-                v
-       Registered evidence retrieved
-                |
-                v
-         Fingerprints compared
-                |
-         +------+------+
-         |             |
-       MATCH        MISMATCH
-         |             |
-         v             v
-      VERIFIED     NOT VERIFIED
+        ↓
+Backend calculates submitted file's SHA-256
+        ↓
+Registered fingerprint is retrieved
+        ↓
+Fingerprints compared
+        ↓
+MATCH → VERIFIED     MISMATCH → NOT VERIFIED
 ```
 
 ### Provenance analysis
 
 ```text
-Registered artifact
-        |
-        v
-Provenance metadata retrieved
-        |
-        v
+Artifact provenance metadata
+        ↓
 Lineage graph constructed
-        |
-        v
-Consistency rules evaluated
-        |
-        v
-Risk score + findings returned
+        ↓
+Configured consistency rules evaluated
+        ↓
+Risk level, score, and findings returned
 ```
 
 ---
 
-## System Architecture
-
-ProvenanceAI separates the user interface, application logic, off-chain metadata, and blockchain evidence.
+## System architecture
 
 ```text
-+----------------------------------------+
-|             React Frontend             |
-|                                        |
-|  Register | Verify | Artifacts          |
-|  Provenance | AI Analysis | Overview    |
-+-------------------+--------------------+
-                    |
-                    | REST API
-                    v
-+----------------------------------------+
-|           Node.js / Express            |
-|                                        |
-|  Upload handling                       |
-|  SHA-256 hashing                       |
-|  Input validation                      |
-|  Artifact registration                 |
-|  Integrity verification                |
-|  Provenance analysis                   |
-|  Metadata repository                   |
-+-------------+-------------+------------+
-              |             |
-              v             v
-+-------------------+  +------------------+
-| Metadata Storage  |  | Ethereum Sepolia |
-|                   |  |                  |
-| Memory / Optional |  | Solidity Smart   |
-| Firestore         |  | Contract         |
-|                   |  |                  |
-| Artifact metadata |  | Registration     |
-| Provenance data   |  | evidence         |
-+-------------------+  +------------------+
+┌────────────────────────────────────────────┐
+│             React + TypeScript             │
+│  Overview · Register · Verify · Provenance  │
+└──────────────────────┬─────────────────────┘
+                       │ REST API (/api)
+                       ▼
+┌────────────────────────────────────────────┐
+│          Node.js + Express + TypeScript     │
+│ Uploads · Validation · SHA-256 · Web3       │
+│ Registration · Verification · Analysis     │
+└──────────────────┬─────────────────┬───────┘
+                   │                 │
+                   ▼                 ▼
+┌────────────────────────┐  ┌──────────────────────┐
+│ Off-chain metadata     │  │ Ethereum Sepolia     │
+│ In-memory / Firestore  │  │ Solidity smart       │
+│ Artifact + lineage     │  │ contract and evidence│
+└────────────────────────┘  └──────────────────────┘
 ```
 
-### Evidence storage model
+### Evidence and storage model
 
-ProvenanceAI separates information according to its purpose.
-
-| Information | Storage |
+| Information | Where it is handled |
 |---|---|
 | Original uploaded artifact | Processed off-chain; not stored on-chain |
-| Cryptographic registration evidence | Smart contract |
+| Cryptographic registration evidence | Solidity smart contract on Sepolia |
 | Artifact metadata | Backend metadata repository |
 | Structured provenance | Backend metadata repository |
 | Transaction evidence | Ethereum Sepolia |
 
-The blockchain serves as the independent integrity anchor, while off-chain storage supports richer application functionality.
+The blockchain is the integrity anchor. The backend repository holds the richer application metadata needed for artifact details and lineage views.
 
 ---
 
-## Technology Stack
+## Technology stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | React, TypeScript, Vite |
 | Backend | Node.js, Express, TypeScript |
-| Blockchain | Ethereum Sepolia |
 | Smart contract | Solidity |
-| Cryptographic hashing | SHA-256 |
-| Web3 integration | Backend-to-contract interaction |
-| Metadata persistence | Repository abstraction with in-memory and optional Firebase Firestore implementations |
+| Blockchain network | Ethereum Sepolia |
+| Hashing | SHA-256 |
+| Web3 integration | Backend-managed contract interaction |
+| Metadata | Repository abstraction; in-memory or optional Firebase Firestore |
 | Integrity analysis | Deterministic, rule-based provenance analyzer |
-| Backend testing | Vitest |
-| Version control | Git and GitHub |
+| Backend tests | Vitest |
+| Contract tests | Hardhat |
+| Version control | Git, GitHub |
 
 ---
 
-## Blockchain Deployment
+## Smart contract deployment
 
-The existing smart contract is deployed on the Ethereum Sepolia test network.
+The current contract is deployed to the **Ethereum Sepolia testnet**.
 
 | Parameter | Value |
 |---|---|
 | Network | Ethereum Sepolia |
 | Chain ID | `11155111` |
-| Contract address | `0x1361CCbaB258e2cBb7Cb2dF7Efa03b2F06d8d431` |
+| Contract | `0x1361CCbaB258e2cBb7Cb2dF7Efa03b2F06d8d431` |
 | Environment | Testnet |
 
-**Contract:** [View on Sepolia Etherscan](https://sepolia.etherscan.io/address/0x1361CCbaB258e2cBb7Cb2dF7Efa03b2F06d8d431)
+- [View the contract on Sepolia Etherscan](https://sepolia.etherscan.io/address/0x1361CCbaB258e2cBb7Cb2dF7Efa03b2F06d8d431)
+- [View the recorded demo registration transaction](https://sepolia.etherscan.io/tx/0xf86262eff7243f35128f6c706341181c8e56bd6739685fb74bea5a844cbea17d)
 
-The application uses a backend-managed blockchain integration. Users do not need to enter wallet private keys into the website.
-
-Never commit private keys, RPC credentials, or production secrets to this repository.
+The application uses a backend-managed wallet for contract interactions. A user's browser should never receive the backend private key.
 
 ---
 
-## Live Registration and Verification Demo
+## Recorded live integration demo
 
-The following artifact was registered through the application's live registration interface during integration testing.
+The repository documents an artifact registered through the application's live registration interface during integration testing.
 
-**Artifact ID**
-
-```text
-art_e4e1b63ff7674f988260822cf3f5
-```
-
-**Artifact details**
-
-| Field | Value |
+| Field | Recorded value |
 |---|---|
+| Artifact ID | `art_e4e1b63ff7674f988260822cf3f5` |
 | File | `qa-model-v1.txt` |
-| Type | `model` |
-| Version | `v1.0.0` |
+| Type / version | `model` / `v1.0.0` |
 | Network | Sepolia |
 | Chain ID | `11155111` |
+| SHA-256 | `508edddc75104a57bf480d481e0b2775a2be3d87d40a62358c356ee5516a3d6c` |
+| Transaction | [Open on Etherscan](https://sepolia.etherscan.io/tx/0xf86262eff7243f35128f6c706341181c8e56bd6739685fb74bea5a844cbea17d) |
 
-**Registered SHA-256 fingerprint**
+### Observed integration checks
 
-```text
-508edddc75104a57bf480d481e0b2775a2be3d87d40a62358c356ee5516a3d6c
-```
-
-**Registration transaction**
-
-[View transaction on Sepolia Etherscan](https://sepolia.etherscan.io/tx/0xf86262eff7243f35128f6c706341181c8e56bd6739685fb74bea5a844cbea17d)
-
-### Observed integration results
-
-| Test | Result |
+| Check | Recorded result |
 |---|---|
-| Live artifact registration | Successful API registration response |
-| Artifact ID generation | PASS |
+| Registration API response and artifact ID generation | PASS |
 | Fingerprint generation | PASS |
 | Artifact detail lookup | PASS |
 | Original-file verification | VERIFIED |
 | Complete provenance retrieval | PASS |
 | Four-node lineage display | PASS |
-| Deterministic provenance analysis | NONE risk / score 0 |
+| Deterministic analysis for complete demo lineage | NONE risk / score 0 |
 
-The UI returned the registration transaction hash. Its independent confirmation status can be checked using the Etherscan link above.
+The transaction link allows the registration evidence to be independently inspected on the Sepolia explorer. Always check the explorer for current transaction confirmation details.
 
 ---
 
-## Getting Started
+## Getting started locally
 
 ### Prerequisites
-
-Install the following before running the project:
-
 - Node.js and npm
 - Git
-- An Ethereum Sepolia RPC endpoint
-- A configured testnet wallet for backend-managed registrations
-- Optional: Firebase project for durable metadata persistence
+- Ethereum Sepolia RPC endpoint
+- A funded Sepolia test wallet for backend-managed registration transactions
+- Optional Firebase project and credentials for durable metadata persistence
 
-Sepolia test ETH is required for transactions that write to the blockchain.
+Sepolia test ETH is needed for transactions that write to the contract.
 
 ### 1. Clone the repository
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
+git clone https://github.com/alizahh-7/provenance-ai.git
 cd provenance-ai
 ```
 
-Replace `<YOUR_REPOSITORY_URL>` with the actual GitHub repository URL.
-
-### 2. Install dependencies
-
-From the project root:
+### 2. Install root/backend dependencies
 
 ```bash
 npm install
@@ -400,23 +250,22 @@ npm install
 
 ### 3. Configure the backend
 
-Use the repository's `.env.example` as the reference for supported configuration.
+Create a private `.env` file in the repository root. Use `.env.example` as the source of truth for supported variables.
 
-Create a private `.env` file and supply the required blockchain configuration, including:
+At minimum, configure:
 
 ```dotenv
-RPC_URL=
-PRIVATE_KEY=
+RPC_URL=your_sepolia_rpc_url
+PRIVATE_KEY=your_backend_test_wallet_private_key
 CONTRACT_ADDRESS=0x1361CCbaB258e2cBb7Cb2dF7Efa03b2F06d8d431
-
+CHAIN_ID=11155111
+PORT=3001
 METADATA_STORAGE=memory
 ```
 
-Use the exact additional variables documented in `.env.example` for your installed version.
+Never commit `.env`, wallet private keys, RPC credentials, Firebase service-account credentials, or other secrets.
 
-**Important:** Never commit `.env`, wallet private keys, service-account credentials, or other secrets.
-
-### 4. Configure the frontend
+### 4. Configure the frontend for local development
 
 Create or update `frontend/.env.local`:
 
@@ -425,359 +274,207 @@ VITE_API_BASE_URL=http://localhost:3001/api
 VITE_USE_MOCK_API=false
 ```
 
-Setting `VITE_USE_MOCK_API=false` enables the real backend integration.
+The frontend defaults to the same-origin `/api` path when `VITE_API_BASE_URL` is not set. Use the localhost URL above when running the Vite frontend and Express backend on separate local ports.
 
 ### 5. Start the backend
 
-Open a terminal in the project root:
+From the repository root:
 
 ```bash
 npm run dev -w backend
 ```
 
-Expected startup message:
-
-```text
-ProvenanceAI API listening on port 3001
-```
-
 ### 6. Start the frontend
 
-Open a second terminal:
+In a second terminal:
 
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite, typically:
+Open the local URL printed by Vite (typically [http://localhost:5173](http://localhost:5173)).
 
-```text
-http://localhost:5173
-```
-
-Keep both terminals running.
-
-### 7. Check backend connectivity
+### 7. Check the API
 
 ```bash
 curl http://localhost:3001/api/health
 ```
 
-Expected response:
+The health endpoint should return a successful status response.
 
-```json
-{
-  "success": true,
-  "status": "ok"
-}
-```
+### 8. Check blockchain configuration
 
-### 8. Verify blockchain configuration
-
-From the project root:
+From the repository root:
 
 ```bash
 npm run config:check
 ```
 
-The configured network should report chain ID `11155111`.
+The configured network should report chain ID `11155111` and a reachable RPC endpoint.
 
 ---
 
-## API Reference
+## Build and test
 
-The frontend communicates with the backend through the `/api` prefix.
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/api/health` | Backend health check |
-| POST | `/api/artifacts/register` | Register a new artifact |
-| POST | `/api/artifacts/verify` | Verify a file against a registered artifact |
-| GET | `/api/artifacts/:id` | Retrieve an artifact record |
-| GET | `/api/provenance/:id` | Retrieve provenance and analysis |
-| GET | `/api/artifacts` | Retrieve recent activity when supported by persistent storage |
-
-### Registration request
-
-`POST /api/artifacts/register`
-
-Uses `multipart/form-data`.
-
-| Field | Description |
-|---|---|
-| `artifact` | Uploaded file |
-| `artifactType` | Artifact category |
-| `version` | Version identifier |
-| `metadataUri` | Optional metadata reference |
-| `provenance` | Optional serialized provenance JSON |
-
-The backend performs authoritative validation and blockchain registration.
-
-### Verification request
-
-`POST /api/artifacts/verify`
-
-Uses `multipart/form-data`.
-
-| Field | Description |
-|---|---|
-| `artifact` | File being verified |
-| `artifactId` | Existing registered artifact ID |
-
-The backend recalculates the submitted file's fingerprint and checks it against the registered evidence.
-
-### Metadata persistence
-
-The application supports two metadata repository configurations.
-
-**Memory mode**
-
-```dotenv
-METADATA_STORAGE=memory
-```
-
-Suitable for local development and isolated testing.
-
-Memory-backed metadata is not durable across backend restarts. The recent-activity endpoint can return:
-
-```text
-503 PERSISTENCE_UNAVAILABLE
-```
-
-This is an intentional capability response, not a successful history listing.
-
-**Firestore mode**
-
-```dotenv
-METADATA_STORAGE=firestore
-```
-
-Configure the Firebase Admin credentials using the supported variables documented in `.env.example`.
-
-Firestore enables durable off-chain metadata and activity history.
-
-The blockchain registration and the off-chain metadata repository are separate systems. If a blockchain transaction succeeds but metadata persistence fails, do not blindly retry registration; first recover the existing registration.
-
----
-
-## Using the Application
-
-### Register an artifact
-
-1. Open **Register**.
-2. Upload a supported file.
-3. Select its artifact type.
-4. Enter its version.
-5. Optionally provide a metadata URI and provenance JSON.
-6. Review the details.
-7. Submit the registration once.
-8. Save the returned artifact ID and transaction information.
-
-The frontend includes validation for malformed provenance JSON, incompatible version/type information, and the configured upload-size limit.
-
-**Registration sends a real Sepolia transaction when the application is running in live API mode.**
-
-### Verify an artifact
-
-1. Open **Verify**.
-2. Enter the registered artifact ID.
-3. Upload the file to be checked.
-4. Select **Verify Integrity**.
-5. Inspect the calculated and expected fingerprints.
-
-A matching fingerprint returns VERIFIED. A modified file should return a failed verification result.
-
-### Explore provenance
-
-1. Open **Provenance**.
-2. Enter an existing artifact ID.
-3. Load the provenance record.
-4. Explore the returned lineage nodes.
-5. Inspect the selected node's metadata and analysis results.
-
-### Analyze integrity
-
-Open **AI Analysis** and load an existing artifact to inspect the backend's deterministic risk assessment.
-
----
-
-## Demo Provenance Fixture
-
-The repository includes:
-
-```text
-docs/demo/complete-lineage-provenance.json
-```
-
-This fictional fixture demonstrates a complete AI development lineage:
-
-```text
-dataset-climate-2025
-        |
-        v
-prep-normalize-07
-        |
-        v
-train-xgb-2025-04-18
-        |
-        v
-Regional Forecast Model
-```
-
-The registration form should use:
-
-```text
-Artifact type: model
-Version: v1.0.0
-```
-
-The selected version must match the corresponding version declared in the provenance metadata.
-
-For a valid complete-lineage registration, the expected analysis is:
-
-- Four recorded nodes.
-- Three recorded connections.
-- No configured consistency issues.
-- Risk score 0.
-
-This is fictional demonstration metadata. It does not represent a real audited climate model or independently verified training dataset.
-
----
-
-## Testing and Validation
-
-The project includes automated backend and blockchain tests.
-
-The latest reported integration verification produced:
-
-| Test | Result |
-|---|---|
-| Frontend production build | PASS |
-| Backend TypeScript build | PASS |
-| Backend automated tests | 30/30 PASS |
-| Blockchain tests | 2/2 PASS |
-| Git diff whitespace check | PASS |
-| Frontend route availability | PASS |
-| Backend health | HTTP 200 |
-| Existing Sepolia artifact lookup | HTTP 200 |
-| Original demo-file verification | PASS |
-| Tampered demo-file verification | FAIL, as expected |
-| Provenance API integration | PASS |
-
-These are recorded development test results, not a claim that every possible browser interaction has been exhaustively tested.
-
-### Run the tests
-
-From the project root:
+Run from the repository root:
 
 ```bash
 npm run build -w backend
 npm run test -w backend
 npm run test -w blockchain
-```
-
-Build the frontend:
-
-```bash
-npm run build -w frontend
-```
-
-Check blockchain connectivity:
-
-```bash
+npm run build --prefix frontend
+npm run compile -w blockchain
 npm run config:check
 ```
 
-### Manual QA coverage
+### Latest recorded development verification
 
-Manual testing has additionally exercised the live registration success flow, artifact detail lookup, original-file verification, and complete-lineage provenance display.
+The integration work recorded on 21 November 2026 included:
+- Backend automated tests: **30/30 passed**
+- Solidity/Hardhat tests: **2/2 passed**
+- Backend TypeScript build: passed
+- Frontend production build: passed
+- Hardhat contract compilation: passed
+- Backend health endpoint: HTTP 200
+- Sepolia configuration and RPC connectivity check: passed
+- Original demo-file verification: passed
+- Tampered demo-file verification: failed as expected
 
----
-
-## Security and Design Considerations
-
-ProvenanceAI follows several important design principles.
-
-**1. Raw files remain off-chain.**
-
-The blockchain is used for registration evidence, not as general-purpose file storage.
-
-**2. Verification is fingerprint-based.**
-
-The system compares cryptographic fingerprints instead of relying on filenames or user assertions.
-
-**3. Wallet credentials stay server-side.**
-
-Private keys must never be entered into frontend forms or exposed through client-side environment variables.
-
-**4. Blockchain evidence and metadata have different trust properties.**
-
-The blockchain provides tamper-evident registration evidence. Submitted descriptive metadata must still be assessed on its own merits.
-
-**5. Risk scores are explainable signals, not absolute guarantees.**
-
-A score of zero indicates that no configured consistency rules were violated. It does not establish that every supplied provenance claim is truthful.
-
-**6. Failed responses require careful transaction handling.**
-
-An interrupted API response does not necessarily mean that a blockchain transaction failed. Transaction status should be checked before retrying.
+These are recorded development checks, not a claim of exhaustive testing across every browser, network, or production environment.
 
 ---
 
-## Target Users
+## Deployment notes
 
-ProvenanceAI is designed for people and organizations that need independently checkable evidence about digital artifacts.
+The Express application is configured to serve the built frontend from `frontend/dist` as well as expose the API under `/api`. This supports a **single Node.js web service** deployment with frontend and backend on the same origin.
 
-**Primary users**
+For a Node host using the repository root as its working directory, the build and start commands are:
 
-- Open-source AI model maintainers.
-- AI startups publishing datasets and model versions.
-- Teams requiring reproducible artifact records.
+**Build command**
 
-**Secondary users**
+```bash
+npm install && npm ci --prefix frontend && npm run build -w backend && npm run build --prefix frontend
+```
 
-- AI auditors and compliance teams.
-- Researchers investigating model provenance.
-- Journalists examining public AI development claims.
-- Downstream users verifying distributed AI artifacts.
+**Start command**
 
-The broader objective is to make AI integrity evidence accessible without requiring every verifier to have access to an organization's internal infrastructure.
+```bash
+npm start -w backend
+```
+
+Set the backend environment variables in the hosting provider's secret/environment settings. Use a persistent metadata store such as Firestore for production; in-memory metadata is lost when the process restarts.
+
+**Netlify note:** Netlify can host the Vite frontend as a static site, but it does not run this Express server as a persistent Node service. For a separate Netlify frontend deployment, set `VITE_API_BASE_URL` to the public URL of a separately hosted backend and configure backend CORS to allow the Netlify site origin. Do not put backend secrets in `VITE_*` variables.
 
 ---
 
-## Current MVP and Future Scope
+## Metadata persistence and limitations
 
-### Implemented MVP
+The metadata repository supports two modes:
 
-- React-based multi-page application.
-- Backend-managed artifact registration.
-- SHA-256 fingerprinting.
-- Ethereum Sepolia smart contract integration.
-- Independent file verification.
-- Artifact lookup.
-- Structured provenance metadata.
-- Interactive provenance visualization.
-- Deterministic integrity analysis.
-- Optional Firestore metadata persistence.
-- Automated backend and blockchain testing.
+### In-memory mode
 
-### Future enhancements
+```dotenv
+METADATA_STORAGE=memory
+```
 
-The following are potential extensions, not claims about the current implementation:
+Useful for local development and short-lived demos. Metadata and activity history are not durable across backend restarts. A blockchain registration can remain on-chain even if the in-memory metadata record is lost.
 
-- More accessible, guided onboarding for non-technical users.
-- Expanded lineage consistency checks.
-- LLM-assisted explanations of provenance findings.
-- Independent validation of supporting provenance documents.
-- Richer metadata and evidence attachments.
-- Persistent activity dashboards.
-- Support for additional blockchain networks.
-- Software supply-chain artifact verification.
-- Academic research-data integrity verification.
-- Improved audit-report generation and export.
+### Firestore mode
 
-Our long-term vision is to make independently verifiable provenance a practical component of trustworthy AI infrastructure.
+```dotenv
+METADATA_STORAGE=firestore
+```
+
+Requires Firebase Admin credentials configured using the supported variables in `.env.example`. Firestore provides durable off-chain artifact and provenance metadata.
+
+Blockchain registration and off-chain metadata persistence are separate operations. If an API response is interrupted or metadata persistence fails after a transaction, check the transaction and existing artifact record before retrying; do not blindly submit duplicate registrations.
+
+---
+
+## Demo provenance fixture
+
+The repository includes `docs/demo/complete-lineage-provenance.json`, a fictional example describing:
+
+```text
+dataset-climate-2025
+        ↓
+prep-normalize-07
+        ↓
+train-xgb-2025-04-18
+        ↓
+Regional Forecast Model
+```
+
+It describes a model with version `v1.0.0`, a dataset with 18,420 rows, z-score preprocessing, and an XGBoost training configuration with seed 42.
+
+This is fictional demonstration metadata. It does not represent a real audited climate model or independently verified training dataset.
+
+---
+
+## API overview
+
+The frontend uses the backend `/api` prefix.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health` | Backend health check |
+| POST | `/api/artifacts/register` | Register an artifact |
+| POST | `/api/artifacts/verify` | Verify an uploaded file |
+| GET | `/api/artifacts/:id` | Retrieve artifact details |
+| GET | `/api/provenance/:id` | Retrieve provenance and analysis |
+| GET | `/api/artifacts` | Retrieve recent artifacts when persistent storage supports it |
+
+Registration and verification use `multipart/form-data`. Registration accepts the uploaded artifact, artifact type, version, and optional metadata/provenance fields. Verification accepts the uploaded artifact and its registered artifact ID.
+
+---
+
+## Security and trust boundaries
+
+1. **Raw files stay off-chain.** The smart contract stores registration evidence, not general-purpose file contents.
+2. **Verification is fingerprint-based.** Filenames and user assertions are not substitutes for a cryptographic comparison.
+3. **Private keys stay server-side.** Never expose wallet credentials in frontend code or client-side environment variables.
+4. **On-chain evidence and metadata are different.** A blockchain record can make a fingerprint registration tamper-evident; it cannot independently validate the truth of descriptive metadata.
+5. **Risk scores are bounded signals.** A zero score means no configured consistency checks failed, not proof of complete truth or safety.
+6. **Handle uncertain transaction outcomes carefully.** Check transaction status before retrying after a timeout or interrupted response.
+
+---
+
+## Target users and potential impact
+
+- AI model and dataset maintainers publishing versioned artifacts
+- AI startups and engineering teams that need traceable artifact records
+- Researchers working with reproducibility and data/model lineage
+- Auditors and downstream users who need to compare a file against registered evidence
+
+The goal is to make integrity evidence easier to inspect without requiring every verifier to access an organization's private development infrastructure.
+
+## Current MVP and future scope
+
+### Implemented in the current MVP
+- React-based application workflows
+- Backend-managed artifact registration
+- SHA-256 fingerprinting
+- Ethereum Sepolia smart contract integration
+- File integrity verification
+- Artifact lookup
+- Structured provenance metadata
+- Interactive provenance visualization
+- Deterministic, rule-based integrity analysis
+- In-memory and optional Firestore metadata repository
+- Automated backend and smart-contract tests
+- Express static serving for the built frontend
+
+### Potential future extensions (not current MVP claims)
+- Expanded lineage and consistency checks
+- LLM-assisted explanations of findings
+- Independent validation of supporting provenance documents
+- Additional metadata/evidence attachments
+- More blockchain networks
+- Exportable audit reports
+- Broader software supply-chain and research-data provenance support
 
 ---
 
@@ -785,30 +482,24 @@ Our long-term vision is to make independently verifiable provenance a practical 
 
 Developed for **HACKSPHERE 2026 — COMPSPHERE 12**, International Team Category.
 
-| Team member | Responsibility |
+| Team member | Project responsibility |
 |---|---|
-| **Syeda Alizah** — Team Lead | Backend, Web3 integration, final integration and testing |
-| **Sarah Aejaz** | AI analysis and provenance |
-| **Marzia Tasneem** | Frontend development |
+| Syeda Alizah — Team Lead | Backend, Web3 integration, final integration and testing |
+| Sarah Aejaz | AI analysis and provenance |
+| Marzia Tasneem | Frontend development |
 
-The project brings together Web3, software engineering, and AI provenance to address the challenge of independently verifiable AI artifacts.
+## Project status
 
----
+**Working MVP · Integration and UX refinement**
 
-## Project Status
-
-**Working MVP — Integration and UX refinement phase**
-
-The core registration, verification, artifact lookup, provenance visualization, and deterministic analysis workflows have been implemented and tested.
-
-The team is continuing to refine the user experience and prepare for the next hackathon phase.
+The core registration, verification, artifact lookup, provenance visualization, and deterministic analysis workflows have been implemented and exercised through automated and integration testing.
 
 ---
 
-## Closing Note
+## Closing
 
 AI accountability should not depend entirely on trusting the organization making the claim.
 
-ProvenanceAI takes a practical step toward independent verification by combining cryptographic fingerprints, blockchain registration evidence, structured lineage, and explainable integrity analysis.
+ProvenanceAI combines cryptographic fingerprints, blockchain registration evidence, structured lineage, and explainable consistency analysis to help people independently check digital AI artifacts.
 
 **Don't just trust the artifact. Verify its evidence.**
